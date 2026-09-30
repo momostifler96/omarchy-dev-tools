@@ -646,6 +646,110 @@ registerTool({
   }
 });
 
+registerTool({
+  id: "vhost",
+  name: "Gestionnaire de vhosts",
+  category: "Réseau local",
+  render(root) {
+    root.innerHTML = `
+      <h2>Créer un vhost local</h2>
+      <p class="desc">
+        Ajoute un domaine local (ex: <code>monapp.test</code>) pointé vers un port,
+        avec reverse proxy nginx en option. Nécessite <code>sudo</code> : la commande
+        est générée ici, à exécuter dans un terminal.
+      </p>
+      <div class="row">
+        <div><label>Domaine</label><input type="text" id="vh-domain" placeholder="monapp.test" /></div>
+        <div><label>Port local</label><input type="text" id="vh-port" placeholder="3000" /></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:12px;">
+        <input type="checkbox" id="vh-nginx" checked style="width:auto" />
+        Configurer un reverse proxy nginx (sinon: juste l'entrée /etc/hosts)
+      </label>
+
+      <label>Commande à exécuter</label>
+      <div class="result" id="vh-add-cmd"></div>
+      <button class="ghost" id="vh-copy-add">Copier</button>
+
+      <label>Autres commandes utiles</label>
+      <div class="result" id="vh-other-cmds"></div>
+    `;
+    const domain = $("#vh-domain", root), port = $("#vh-port", root), useNginx = $("#vh-nginx", root);
+    const addCmd = $("#vh-add-cmd", root), otherCmds = $("#vh-other-cmds", root);
+
+    function safe(v, fallback) { return (v || "").trim() || fallback; }
+
+    function update() {
+      const d = safe(domain.value, "monapp.test");
+      const p = safe(port.value, "3000");
+      const flag = useNginx.checked ? "" : " --no-nginx";
+      addCmd.textContent = `sudo omarchy-vhost add ${d} ${p}${flag}`;
+      otherCmds.textContent =
+        `omarchy-vhost list\nsudo omarchy-vhost remove ${d}`;
+    }
+    [domain, port, useNginx].forEach(el => el.addEventListener("input", update));
+    useNginx.addEventListener("change", update);
+    update();
+
+    $("#vh-copy-add", root).onclick = () => copyToClipboard(addCmd.textContent);
+  }
+});
+
+registerTool({
+  id: "ngrok",
+  name: "Exposer via ngrok",
+  category: "Réseau local",
+  render(root) {
+    root.innerHTML = `
+      <h2>Exposer un serveur local avec ngrok</h2>
+      <p class="desc">
+        Génère la commande pour exposer un port local publiquement, et affiche
+        en direct le(s) tunnel(s) actif(s) en interrogeant l'API locale d'ngrok
+        (<code>http://127.0.0.1:4040</code>).
+      </p>
+      <label>Port local à exposer</label>
+      <input type="text" id="ng-port" placeholder="3000" />
+      <label>Options ngrok supplémentaires (optionnel)</label>
+      <input type="text" id="ng-opts" placeholder="--domain=mondomaine.ngrok-free.app" />
+
+      <label>Commande à lancer dans un terminal</label>
+      <div class="result" id="ng-cmd"></div>
+      <button class="ghost" id="ng-copy">Copier</button>
+
+      <label style="margin-top:20px;">Tunnels actifs (rafraîchi toutes les 2s)</label>
+      <div class="result" id="ng-status">Vérification…</div>
+    `;
+    const port = $("#ng-port", root), opts = $("#ng-opts", root), cmd = $("#ng-cmd", root), status = $("#ng-status", root);
+
+    function updateCmd() {
+      const p = (port.value || "").trim() || "3000";
+      const o = (opts.value || "").trim();
+      cmd.textContent = `omarchy-ngrok ${p}${o ? " " + o : ""}`;
+    }
+    [port, opts].forEach(el => el.addEventListener("input", updateCmd));
+    updateCmd();
+    $("#ng-copy", root).onclick = () => copyToClipboard(cmd.textContent);
+
+    async function pollTunnels() {
+      if (!root.classList.contains("active")) return;
+      try {
+        const res = await fetch("http://127.0.0.1:4040/api/tunnels", { cache: "no-store" });
+        const data = await res.json();
+        if (!data.tunnels || !data.tunnels.length) {
+          showResult(status, "Aucun tunnel actif pour le moment.", "");
+        } else {
+          const lines = data.tunnels.map(t => `${t.proto.toUpperCase()}  ${t.public_url}  →  ${t.config.addr}`);
+          showResult(status, lines.join("\n"), "ok");
+        }
+      } catch (e) {
+        showResult(status, "Agent ngrok injoignable (lance d'abord la commande ci-dessus).", "err");
+      }
+    }
+    pollTunnels();
+    setInterval(pollTunnels, 2000);
+  }
+});
+
 // ---------- App shell ----------
 const listEl = $("#tool-list");
 const contentEl = $("#content");

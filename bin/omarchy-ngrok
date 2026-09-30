@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# omarchy-ngrok — expose un port local via ngrok.
+#
+# Usage:
+#   omarchy-ngrok <port> [args ngrok supplémentaires...]
+#   omarchy-ngrok status      # affiche les tunnels actifs (API locale ngrok)
+set -euo pipefail
+
+API="http://127.0.0.1:4040/api/tunnels"
+
+if ! command -v ngrok >/dev/null 2>&1; then
+  echo "omarchy-ngrok: ngrok introuvable dans le PATH." >&2
+  echo "  Installe-le: https://ngrok.com/download" >&2
+  exit 1
+fi
+
+if [[ "${1:-}" == "status" ]]; then
+  if command -v curl >/dev/null 2>&1; then
+    curl -sf "$API" || { echo "omarchy-ngrok: aucun agent ngrok actif (API ${API} injoignable)." >&2; exit 1; }
+  else
+    echo "omarchy-ngrok: curl requis pour 'status'." >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+PORT="${1:?Usage: omarchy-ngrok <port> [args ngrok...]}"
+shift || true
+
+echo "omarchy-ngrok: exposition du port ${PORT} via ngrok…"
+echo "  (dashboard local: http://127.0.0.1:4040)"
+exec ngrok http "$PORT" "$@"

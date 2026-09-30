@@ -53,6 +53,12 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   echo "      export PATH=\"\$HOME/.local/bin:\$PATH\""
 fi
 
+# 1bis. Outils CLI complémentaires (vhost, ngrok)
+cp "$PLUGIN_DIR/bin/omarchy-vhost" "$BIN_DIR/omarchy-vhost"
+cp "$PLUGIN_DIR/bin/omarchy-ngrok" "$BIN_DIR/omarchy-ngrok"
+chmod +x "$BIN_DIR/omarchy-vhost" "$BIN_DIR/omarchy-ngrok"
+echo "  - CLI installées: $BIN_DIR/omarchy-vhost, $BIN_DIR/omarchy-ngrok"
+
 # 2. Raccourci clavier Hyprland
 cp "$PLUGIN_DIR/hypr/omarchy-dev-tools.conf" "$HYPR_PLUGINS_DIR/omarchy-dev-tools.conf"
 echo "  - config Hyprland copiée dans: $HYPR_PLUGINS_DIR/omarchy-dev-tools.conf"

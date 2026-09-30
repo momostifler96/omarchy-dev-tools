@@ -12,6 +12,11 @@ echo "==> Désinstallation d'Omarchy Dev Tools"
 rm -f "$BIN_DIR/omarchy-dev-tools"
 echo "  - launcher retiré: $BIN_DIR/omarchy-dev-tools"
 
+rm -f "$BIN_DIR/omarchy-vhost" "$BIN_DIR/omarchy-ngrok"
+echo "  - CLI retirées: $BIN_DIR/omarchy-vhost, $BIN_DIR/omarchy-ngrok"
+echo "    (les vhosts déjà créés dans /etc/hosts et nginx ne sont pas retirés automatiquement;"
+echo "     utilise 'sudo omarchy-vhost remove <domaine>' avant de désinstaller si besoin)"
+
 rm -rf "$DATA_DIR"
 echo "  - données retirées: $DATA_DIR"
 

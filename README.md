@@ -20,6 +20,10 @@ requête réseau.
 - Générateur Lorem Ipsum
 - Convertisseur de casse (camelCase, snake_case, kebab-case, PascalCase, CONSTANT_CASE)
 - Comparateur de texte ligne à ligne
+- **Gestionnaire de vhosts** : génère et lance la commande pour créer un domaine
+  local (`monapp.test`) pointé sur un port, avec reverse proxy nginx en option
+- **Exposer via ngrok** : génère la commande `omarchy-ngrok <port>` et affiche en
+  direct l'URL publique du tunnel actif
 
 D'autres outils d'it-tools.tech (QR code, chiffrement, conversion de fichiers…)
 pourront être ajoutés ensuite dans `src/index.html` en suivant le même pattern
@@ -59,11 +63,46 @@ pkill -SIGUSR2 waybar
 - **Souris** : clique sur l'icône 󰙯 dans la barre du haut (Waybar).
 - `Échap` ferme la fenêtre.
 
+### Vhosts locaux et exposition ngrok
+
+Ces deux outils déclenchent de vraies actions système (écriture dans
+`/etc/hosts`, config nginx, lancement d'un process ngrok), ce que la page
+web ne peut pas faire elle-même par sécurité. L'onglet correspondant génère
+donc la commande exacte à copier-coller dans un terminal :
+
+```bash
+# Créer un vhost (avec reverse proxy nginx si détecté)
+sudo omarchy-vhost add monapp.test 3000
+
+# Lister les vhosts gérés par omarchy-vhost
+omarchy-vhost list
+
+# Retirer un vhost
+sudo omarchy-vhost remove monapp.test
+
+# Exposer un port local via ngrok
+omarchy-ngrok 3000
+
+# Voir les tunnels ngrok actifs (JSON)
+omarchy-ngrok status
+```
+
+L'onglet "Exposer via ngrok" de l'app interroge en direct l'API locale
+d'ngrok (`http://127.0.0.1:4040/api/tunnels`) et affiche l'URL publique dès
+que `omarchy-ngrok` tourne — inutile de la chercher dans les logs.
+
+Prérequis : [ngrok](https://ngrok.com/download) installé et authentifié
+(`ngrok config add-authtoken ...`) pour l'exposition ; `nginx` installé (et
+sudoers configuré pour l'utilisateur) pour le reverse proxy des vhosts —
+sinon `omarchy-vhost` se limite à l'entrée `/etc/hosts`.
+
 ## Structure du projet
 
 ```
 bin/
   omarchy-dev-tools   # launcher (dev, non installé tel quel)
+  omarchy-vhost       # CLI: gestion des vhosts locaux (hosts + nginx)
+  omarchy-ngrok       # CLI: wrapper ngrok (expose un port, affiche le statut)
   install.sh          # installation du plugin
   uninstall.sh        # désinstallation
 src/
