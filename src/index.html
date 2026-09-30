@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Omarchy Dev Tools</title>
+<style>
+  :root {
+    --bg: #14151a;
+    --panel: #1c1e26;
+    --panel-alt: #22242e;
+    --border: #2d2f3a;
+    --text: #e6e6ea;
+    --muted: #8a8d9a;
+    --accent: #7aa2f7;
+    --accent-dim: #3b4261;
+    --ok: #9ece6a;
+    --err: #f7768e;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", "SF Pro Text", -apple-system, system-ui, sans-serif;
+    display: flex;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 230px;
+    min-width: 230px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 12px 8px;
+    overflow-y: auto;
+  }
+  #brand {
+    font-weight: 700;
+    font-size: 15px;
+    padding: 8px 10px 14px;
+    color: var(--accent);
+    letter-spacing: 0.3px;
+  }
+  #search {
+    margin: 0 4px 10px;
+    padding: 8px 10px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+  }
+  #search:focus { border-color: var(--accent); }
+  .cat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    padding: 10px 10px 4px;
+  }
+  .tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tool-btn:hover { background: var(--panel-alt); }
+  .tool-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .tool-btn .ico { opacity: 0.8; }
+
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #topbar {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    -webkit-app-region: drag;
+  }
+  #content {
+    flex: 1;
+    padding: 20px 26px;
+    overflow-y: auto;
+  }
+  .tool { display: none; max-width: 820px; }
+  .tool.active { display: block; }
+  .tool h2 { margin: 0 0 4px; font-size: 18px; }
+  .tool p.desc { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+  label { font-size: 12px; color: var(--muted); display: block; margin: 12px 0 4px; }
+  textarea, input[type=text], input[type=number], select {
+    width: 100%;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    outline: none;
+    resize: vertical;
+  }
+  textarea:focus, input:focus, select:focus { border-color: var(--accent); }
+  textarea { min-height: 110px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 180px; }
+  button.action {
+    margin-top: 12px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  button.action:hover { background: var(--accent); color: #0e0e12; }
+  button.ghost {
+    margin-top: 12px;
+    margin-left: 8px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button.ghost:hover { color: var(--text); border-color: var(--text); }
+  .result {
+    margin-top: 14px;
+    padding: 12px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 12.5px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 20px;
+  }
+  .result.err { color: var(--err); }
+  .result.ok { color: var(--ok); }
+  .swatch {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+  .kvs { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 13px; margin-top: 10px; }
+  .kvs .k { color: var(--muted); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <div id="brand">⚙ Omarchy Dev Tools</div>
+    <input id="search" type="text" placeholder="Rechercher un outil…" />
+    <div id="tool-list"></div>
+  </div>
+
+  <div id="main">
+    <div id="topbar" id="topbar-title">Base64</div>
+    <div id="content"></div>
+  </div>
+
+<script>
+// ---------- Tool registry ----------
+const TOOLS = [];
+function registerTool(def) { TOOLS.push(def); }
+
+// ---------- Helpers ----------
+function $(sel, root=document) { return root.querySelector(sel); }
+function copyToClipboard(text) {
+  navigator.clipboard && navigator.clipboard.writeText(text).catch(()=>{});
+}
+function showResult(el, text, kind) {
+  el.textContent = text;
+  el.className = "result" + (kind ? " " + kind : "");
+}
+
+// ---------- Tools ----------
+
+registerTool({
+  id: "base64",
+  name: "Base64",
+  category: "Encodage",
+  render(root) {
+    root.innerHTML = `
+      <h2>Base64</h2>
+      <p class="desc">Encoder / décoder du texte en Base64.</p>
+      <label>Texte source</label>
+      <textarea id="b64-in" placeholder="Saisis du texte ou du base64…"></textarea>
+      <div>
+        <button class="action" id="b64-enc">Encoder</button>
+        <button class="action" id="b64-dec">Décoder</button>
+        <button class="ghost" id="b64-copy">Copier</button>
+      </div>
+      <div class="result" id="b64-out"></div>
+    `;
+    const input = $("#b64-in", root), out = $("#b64-out", root);
+    $("#b64-enc", root).onclick = () => {
+      try { showResult(out, btoa(unescape(encodeURIComponent(input.value))), "ok"); }
+      catch(e){ showResult(out, "Erreur: " + e.message, "err"); }
+    };
+    $("#b64-dec", root).onclick = () => {
+      try { showResult(out, decodeURIComponent(escape(atob(input.value.trim()))), "ok"); }
+      catch(e){ showResult(out, "Erreur: entrée base64 invalide", "err"); }
+    };
+    $("#b64-copy", root).onclick = () => copyToClipboard(out.textContent);
+  }
+});
+
+registerTool({
+  id: "url",
+  name: "URL Encode/Decode",
+  category: "Encodage",
+  render(root) {
+    root.innerHTML = `
+      <h2>URL Encode / Decode</h2>
+      <p class="desc">Encoder ou décoder une chaîne pour usage dans une URL.</p>
+      <label>Entrée</label>
+      <textarea id="url-in"></textarea>
+      <div>
+        <button class="action" id="url-enc">Encoder</button>
+        <button class="action" id="url-dec">Décoder</button>
+        <button class="ghost" id="url-copy">Copier</button>
+      </div>
+      <div class="result" id="url-out"></div>
+    `;
+    const input = $("#url-in", root), out = $("#url-out", root);
+    $("#url-enc", root).onclick = () => showResult(out, encodeURIComponent(input.value), "ok");
+    $("#url-dec", root).onclick = () => {
+      try { showResult(out, decodeURIComponent(input.value), "ok"); }
+      catch(e){ showResult(out, "Erreur: " + e.message, "err"); }
+    };
+    $("#url-copy", root).onclick = () => copyToClipboard(out.textContent);
+  }
+});
+
+registerTool({
+  id: "jwt",
+  name: "JWT Decoder",
+  category: "Sécurité",
+  render(root) {
+    root.innerHTML = `
+      <h2>JWT Decoder</h2>
+      <p class="desc">Décode un JSON Web Token (header + payload). Ne vérifie pas la signature.</p>
+      <label>Token JWT</label>
+      <textarea id="jwt-in" placeholder="eyJhbGciOi..."></textarea>
+      <button class="action" id="jwt-run">Décoder</button>
+      <div class="result" id="jwt-out"></div>
+    `;
+    const input = $("#jwt-in", root), out = $("#jwt-out", root);
+    function b64urlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      while (str.length % 4) str += "=";
+      return decodeURIComponent(escape(atob(str)));
+    }
+    $("#jwt-run", root).onclick = () => {
+      const parts = input.value.trim().split(".");
+      if (parts.length < 2) { showResult(out, "Erreur: JWT invalide (attendu header.payload.signature)", "err"); return; }
+      try {
+        const header = JSON.parse(b64urlDecode(parts[0]));
+        const payload = JSON.parse(b64urlDecode(parts[1]));
+        showResult(out, "HEADER\n" + JSON.stringify(header, null, 2) + "\n\nPAYLOAD\n" + JSON.stringify(payload, null, 2), "ok");
+      } catch(e) { showResult(out, "Erreur de décodage: " + e.message, "err"); }
+    };
+  }
+});
+
+registerTool({
+  id: "uuid",
+  name: "Générateur UUID",
+  category: "Générateurs",
+  render(root) {
+    root.innerHTML = `
+      <h2>Générateur UUID</h2>
+      <p class="desc">Génère des UUID v4.</p>
+      <label>Quantité</label>
+      <input type="number" id="uuid-count" value="5" min="1" max="100" style="max-width:120px" />
+      <div>
+        <button class="action" id="uuid-run">Générer</button>
+        <button class="ghost" id="uuid-copy">Copier</button>
+      </div>
+      <div class="result" id="uuid-out"></div>
+    `;
+    const out = $("#uuid-out", root);
+    function gen() { return crypto.randomUUID(); }
+    $("#uuid-run", root).onclick = () => {
+      const n = Math.max(1, Math.min(100, parseInt($("#uuid-count", root).value) || 1));
+      showResult(out, Array.from({length:n}, gen).join("\n"), "ok");
+    };
+    $("#uuid-copy", root).onclick = () => copyToClipboard(out.textContent);
+    $("#uuid-run", root).onclick();
+  }
+});
+
+registerTool({
+  id: "hash",
+  name: "Hash (MD5-like/SHA)",
+  category: "Sécurité",
+  render(root) {
+    root.innerHTML = `
+      <h2>Hash de texte</h2>
+      <p class="desc">Calcule le hash SHA-1 / SHA-256 / SHA-384 / SHA-512 d'un texte.</p>
+      <label>Texte</label>
+      <textarea id="hash-in"></textarea>
+      <label>Algorithme</label>
+      <select id="hash-algo">
+        <option value="SHA-1">SHA-1</option>
+        <option value="SHA-256" selected>SHA-256</option>
+        <option value="SHA-384">SHA-384</option>
+        <option value="SHA-512">SHA-512</option>
+      </select>
+      <button class="action" id="hash-run">Calculer</button>
+      <div class="result" id="hash-out"></div>
+    `;
+    const input = $("#hash-in", root), algo = $("#hash-algo", root), out = $("#hash-out", root);
+    $("#hash-run", root).onclick = async () => {
+      const enc = new TextEncoder().encode(input.value);
+      const buf = await crypto.subtle.digest(algo.value, enc);
+      const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+      showResult(out, hex, "ok");
+    };
+  }
+});
+
+registerTool({
+  id: "json",
+  name: "JSON Formatter",
+  category: "Texte & données",
+  render(root) {
+    root.innerHTML = `
+      <h2>JSON Formatter / Validator</h2>
+      <p class="desc">Formate, valide et minifie du JSON.</p>
+      <label>JSON source</label>
+      <textarea id="json-in" placeholder='{"a":1,"b":[1,2,3]}'></textarea>
+      <div>
+        <button class="action" id="json-fmt">Formater</button>
+        <button class="action" id="json-min">Minifier</button>
+        <button class="ghost" id="json-copy">Copier</button>
+      </div>
+      <div class="result" id="json-out"></div>
+    `;
+    const input = $("#json-in", root), out = $("#json-out", root);
+    function parse() { return JSON.parse(input.value); }
+    $("#json-fmt", root).onclick = () => {
+      try { showResult(out, JSON.stringify(parse(), null, 2), "ok"); }
+      catch(e){ showResult(out, "JSON invalide: " + e.message, "err"); }
+    };
+    $("#json-min", root).onclick = () => {
+      try { showResult(out, JSON.stringify(parse()), "ok"); }
+      catch(e){ showResult(out, "JSON invalide: " + e.message, "err"); }
+    };
+    $("#json-copy", root).onclick = () => copyToClipboard(out.textContent);
+  }
+});
+
+registerTool({
+  id: "regex",
+  name: "Testeur Regex",
+  category: "Texte & données",
+  render(root) {
+    root.innerHTML = `
+      <h2>Testeur de regex</h2>
+      <p class="desc">Teste une expression régulière JavaScript contre un texte.</p>
+      <div class="row">
+        <div><label>Regex</label><input type="text" id="re-pattern" placeholder="\\d+" /></div>
+        <div><label>Flags</label><input type="text" id="re-flags" placeholder="g, i, m…" value="g" /></div>
+      </div>
+      <label>Texte à tester</label>
+      <textarea id="re-text"></textarea>
+      <button class="action" id="re-run">Tester</button>
+      <div class="result" id="re-out"></div>
+    `;
+    const pattern = $("#re-pattern", root), flags = $("#re-flags", root), text = $("#re-text", root), out = $("#re-out", root);
+    $("#re-run", root).onclick = () => {
+      try {
+        const re = new RegExp(pattern.value, flags.value);
+        const matches = [...text.value.matchAll(new RegExp(pattern.value, flags.value.includes("g") ? flags.value : flags.value + "g"))];
+        if (!matches.length) { showResult(out, "Aucune correspondance.", ""); return; }
+        showResult(out, matches.map((m,i) => `#${i}: "${m[0]}" @${m.index}` + (m.length>1 ? "  groupes: " + JSON.stringify(m.slice(1)) : "")).join("\n"), "ok");
+      } catch(e) { showResult(out, "Regex invalide: " + e.message, "err"); }
+    };
+  }
+});
+
+registerTool({
+  id: "color",
+  name: "Convertisseur de couleurs",
+  category: "Design",
+  render(root) {
+    root.innerHTML = `
+      <h2>Convertisseur de couleurs</h2>
+      <p class="desc">Convertit entre HEX, RGB et HSL.</p>
+      <label>Couleur (hex, rgb(...) ou hsl(...))</label>
+      <input type="text" id="color-in" placeholder="#7aa2f7" />
+      <button class="action" id="color-run">Convertir</button>
+      <span class="swatch" id="color-swatch"></span>
+      <div class="kvs" id="color-out"></div>
+    `;
+    const input = $("#color-in", root), swatch = $("#color-swatch", root), out = $("#color-out", root);
+    function hexToRgb(hex) {
+      hex = hex.replace("#","");
+      if (hex.length === 3) hex = hex.split("").map(c=>c+c).join("");
+      const n = parseInt(hex, 16);
+      return [ (n>>16)&255, (n>>8)&255, n&255 ];
+    }
+    function rgbToHsl(r,g,b) {
+      r/=255; g/=255; b/=255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b);
+      let h,s,l=(max+min)/2;
+      if (max===min) { h=s=0; }
+      else {
+        const d = max-min;
+        s = l>0.5 ? d/(2-max-min) : d/(max+min);
+        switch(max){
+          case r: h=(g-b)/d+(g<b?6:0); break;
+          case g: h=(b-r)/d+2; break;
+          case b: h=(r-g)/d+4; break;
+        }
+        h/=6;
+      }
+      return [Math.round(h*360), Math.round(s*100), Math.round(l*100)];
+    }
+    $("#color-run", root).onclick = () => {
+      const v = input.value.trim();
+      let rgb;
+      try {
+        if (v.startsWith("#")) rgb = hexToRgb(v);
+        else if (v.startsWith("rgb")) rgb = v.match(/[\d.]+/g).slice(0,3).map(Number);
+        else if (v.startsWith("hsl")) {
+          const [h,s,l] = v.match(/[\d.]+/g).slice(0,3).map(Number);
+          const c=(1-Math.abs(2*l/100-1))*s/100, x=c*(1-Math.abs((h/60)%2-1)), m=l/100-c/2;
+          let r1,g1,b1;
+          if (h<60){r1=c;g1=x;b1=0;} else if(h<120){r1=x;g1=c;b1=0;} else if(h<180){r1=0;g1=c;b1=x;}
+          else if(h<240){r1=0;g1=x;b1=c;} else if(h<300){r1=x;g1=0;b1=c;} else {r1=c;g1=0;b1=x;}
+          rgb = [Math.round((r1+m)*255), Math.round((g1+m)*255), Math.round((b1+m)*255)];
+        } else throw new Error("format non reconnu");
+        const hex = "#" + rgb.map(c=>c.toString(16).padStart(2,"0")).join("");
+        const hsl = rgbToHsl(...rgb);
+        swatch.style.background = hex;
+        out.innerHTML = `
+          <div class="k">HEX</div><div>${hex}</div>
+          <div class="k">RGB</div><div>rgb(${rgb.join(", ")})</div>
+          <div class="k">HSL</div><div>hsl(${hsl[0]}, ${hsl[1]}%, ${hsl[2]}%)</div>
+        `;
+      } catch(e) { out.innerHTML = `<div class="k"></div><div style="color:var(--err)">Erreur: ${e.message}</div>`; swatch.style.background = "transparent"; }
+    };
+  }
+});
+
+registerTool({
+  id: "timestamp",
+  name: "Convertisseur Timestamp",
+  category: "Date & heure",
+  render(root) {
+    root.innerHTML = `
+      <h2>Convertisseur de timestamp</h2>
+      <p class="desc">Unix timestamp ⇄ date lisible (UTC et locale).</p>
+      <div class="row">
+        <div><label>Timestamp (s ou ms)</label><input type="text" id="ts-in" placeholder="1735689600" /></div>
+        <div><label>Date ISO</label><input type="text" id="ts-date" placeholder="2026-01-01T00:00:00Z" /></div>
+      </div>
+      <div>
+        <button class="action" id="ts-from-ts">Depuis timestamp</button>
+        <button class="action" id="ts-from-date">Depuis date</button>
+        <button class="action" id="ts-now">Maintenant</button>
+      </div>
+      <div class="result" id="ts-out"></div>
+    `;
+    const tsIn = $("#ts-in", root), dateIn = $("#ts-date", root), out = $("#ts-out", root);
+    function report(d) {
+      showResult(out, `ISO:    ${d.toISOString()}\nUTC:    ${d.toUTCString()}\nLocal:  ${d.toString()}\nUnix s: ${Math.floor(d.getTime()/1000)}\nUnix ms:${d.getTime()}`, "ok");
+    }
+    $("#ts-from-ts", root).onclick = () => {
+      let v = parseFloat(tsIn.value.trim());
+      if (isNaN(v)) { showResult(out, "Timestamp invalide", "err"); return; }
+      if (Math.abs(v) < 1e11) v *= 1000;
+      report(new Date(v));
+    };
+    $("#ts-from-date", root).onclick = () => {
+      const d = new Date(dateIn.value.trim());
+      if (isNaN(d.getTime())) { showResult(out, "Date invalide", "err"); return; }
+      report(d);
+    };
+    $("#ts-now", root).onclick = () => { const d = new Date(); tsIn.value = Math.floor(d.getTime()/1000); report(d); };
+  }
+});
+
+registerTool({
+  id: "cron",
+  name: "Explicateur Cron",
+  category: "Date & heure",
+  render(root) {
+    root.innerHTML = `
+      <h2>Explicateur d'expression cron</h2>
+      <p class="desc">Décrit en texte une expression cron classique (5 champs).</p>
+      <label>Expression cron</label>
+      <input type="text" id="cron-in" placeholder="*/5 9-17 * * 1-5" />
+      <button class="action" id="cron-run">Expliquer</button>
+      <div class="result" id="cron-out"></div>
+    `;
+    const input = $("#cron-in", root), out = $("#cron-out", root);
+    const FIELDS = ["minute", "heure", "jour du mois", "mois", "jour de la semaine"];
+    function describeField(val, name) {
+      if (val === "*") return `chaque ${name}`;
+      if (val.includes("/")) {
+        const [range, step] = val.split("/");
+        return `${range === "*" ? "chaque" : range} ${name} par pas de ${step}`;
+      }
+      if (val.includes("-")) return `${name} de ${val.replace("-", " à ")}`;
+      if (val.includes(",")) return `${name} ∈ {${val}}`;
+      return `${name} = ${val}`;
+    }
+    $("#cron-run", root).onclick = () => {
+      const parts = input.value.trim().split(/\s+/);
+      if (parts.length !== 5) { showResult(out, "Erreur: une expression cron standard a 5 champs (minute heure jour mois jour_semaine)", "err"); return; }
+      showResult(out, parts.map((p,i) => describeField(p, FIELDS[i])).join("\n"), "ok");
+    };
+  }
+});
+
+registerTool({
+  id: "lorem",
+  name: "Générateur Lorem Ipsum",
+  category: "Générateurs",
+  render(root) {
+    root.innerHTML = `
+      <h2>Lorem Ipsum</h2>
+      <p class="desc">Génère du texte de remplissage.</p>
+      <label>Nombre de paragraphes</label>
+      <input type="number" id="lorem-n" value="3" min="1" max="20" style="max-width:120px" />
+      <button class="action" id="lorem-run">Générer</button>
+      <button class="ghost" id="lorem-copy">Copier</button>
+      <div class="result" id="lorem-out"></div>
+    `;
+    const WORDS = "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat".split(" ");
+    function paragraph() {
+      const n = 30 + Math.floor(Math.random()*30);
+      let words = [];
+      for (let i=0;i<n;i++) words.push(WORDS[Math.floor(Math.random()*WORDS.length)]);
+      let s = words.join(" ");
+      return s.charAt(0).toUpperCase() + s.slice(1) + ".";
+    }
+    const out = $("#lorem-out", root);
+    $("#lorem-run", root).onclick = () => {
+      const n = Math.max(1, Math.min(20, parseInt($("#lorem-n", root).value) || 1));
+      showResult(out, Array.from({length:n}, paragraph).join("\n\n"), "ok");
+    };
+    $("#lorem-copy", root).onclick = () => copyToClipboard(out.textContent);
+  }
+});
+
+registerTool({
+  id: "textcase",
+  name: "Convertisseur de casse",
+  category: "Texte & données",
+  render(root) {
+    root.innerHTML = `
+      <h2>Convertisseur de casse</h2>
+      <p class="desc">camelCase, snake_case, kebab-case, PascalCase, CONSTANT_CASE…</p>
+      <label>Texte</label>
+      <textarea id="case-in" placeholder="Hello World Example"></textarea>
+      <button class="action" id="case-run">Convertir</button>
+      <div class="kvs" id="case-out"></div>
+    `;
+    function words(s) {
+      return s.replace(/([a-z])([A-Z])/g, "$1 $2")
+              .replace(/[_\-]+/g, " ")
+              .trim().split(/\s+/).filter(Boolean).map(w=>w.toLowerCase());
+    }
+    $("#case-run", root).onclick = () => {
+      const w = words($("#case-in", root).value);
+      const camel = w.map((x,i)=> i===0 ? x : x[0].toUpperCase()+x.slice(1)).join("");
+      const pascal = w.map(x=>x[0].toUpperCase()+x.slice(1)).join("");
+      const snake = w.join("_");
+      const kebab = w.join("-");
+      const constant = w.join("_").toUpperCase();
+      const out = $("#case-out", root);
+      out.innerHTML = `
+        <div class="k">camelCase</div><div>${camel}</div>
+        <div class="k">PascalCase</div><div>${pascal}</div>
+        <div class="k">snake_case</div><div>${snake}</div>
+        <div class="k">kebab-case</div><div>${kebab}</div>
+        <div class="k">CONSTANT_CASE</div><div>${constant}</div>
+      `;
+    };
+  }
+});
+
+registerTool({
+  id: "diff",
+  name: "Comparateur de texte",
+  category: "Texte & données",
+  render(root) {
+    root.innerHTML = `
+      <h2>Comparateur de texte (ligne à ligne)</h2>
+      <p class="desc">Compare deux blocs de texte ligne par ligne.</p>
+      <div class="row">
+        <div><label>Texte A</label><textarea id="diff-a"></textarea></div>
+        <div><label>Texte B</label><textarea id="diff-b"></textarea></div>
+      </div>
+      <button class="action" id="diff-run">Comparer</button>
+      <div class="result" id="diff-out"></div>
+    `;
+    $("#diff-run", root).onclick = () => {
+      const a = $("#diff-a", root).value.split("\n");
+      const b = $("#diff-b", root).value.split("\n");
+      const max = Math.max(a.length, b.length);
+      let lines = [];
+      for (let i=0;i<max;i++) {
+        const la = a[i] ?? "";
+        const lb = b[i] ?? "";
+        if (la === lb) lines.push(`  ${la}`);
+        else { if (a[i] !== undefined) lines.push(`- ${la}`); if (b[i] !== undefined) lines.push(`+ ${lb}`); }
+      }
+      showResult($("#diff-out", root), lines.join("\n") || "Identiques.", "ok");
+    };
+  }
+});
+
+// ---------- App shell ----------
+const listEl = $("#tool-list");
+const contentEl = $("#content");
+const titleEl = document.getElementById("topbar-title");
+const searchEl = $("#search");
+
+const byCategory = {};
+TOOLS.forEach(t => { (byCategory[t.category] ||= []).push(t); });
+
+function buildList(filter = "") {
+  listEl.innerHTML = "";
+  const f = filter.trim().toLowerCase();
+  Object.entries(byCategory).forEach(([cat, tools]) => {
+    const visible = tools.filter(t => !f || t.name.toLowerCase().includes(f));
+    if (!visible.length) return;
+    const label = document.createElement("div");
+    label.className = "cat-label";
+    label.textContent = cat;
+    listEl.appendChild(label);
+    visible.forEach(t => {
+      const btn = document.createElement("button");
+      btn.className = "tool-btn";
+      btn.dataset.id = t.id;
+      btn.innerHTML = `<span class="ico">▸</span> ${t.name}`;
+      btn.onclick = () => selectTool(t.id);
+      listEl.appendChild(btn);
+    });
+  });
+}
+
+const rendered = {};
+function selectTool(id) {
+  const tool = TOOLS.find(t => t.id === id);
+  if (!tool) return;
+  document.querySelectorAll(".tool-btn").forEach(b => b.classList.toggle("active", b.dataset.id === id));
+  document.querySelectorAll(".tool").forEach(el => el.classList.remove("active"));
+  titleEl.textContent = tool.name;
+  if (!rendered[id]) {
+    const div = document.createElement("div");
+    div.className = "tool";
+    div.id = "tool-" + id;
+    contentEl.appendChild(div);
+    tool.render(div);
+    rendered[id] = div;
+  }
+  rendered[id].classList.add("active");
+  localStorage.setItem("last-tool", id);
+}
+
+searchEl.addEventListener("input", () => buildList(searchEl.value));
+
+buildList();
+selectTool(localStorage.getItem("last-tool") || TOOLS[0].id);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { try { window.close(); } catch(_){} }
+});
+</script>
+</body>
+</html>

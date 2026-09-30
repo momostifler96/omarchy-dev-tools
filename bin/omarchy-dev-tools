@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Lance Omarchy Dev Tools dans une fenêtre app (Chromium/Chrome en mode --app),
+# sans onglets ni barre d'adresse, façon application native.
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INDEX_FILE="$PLUGIN_DIR/src/index.html"
+
+if [[ ! -f "$INDEX_FILE" ]]; then
+  echo "omarchy-dev-tools: introuvable: $INDEX_FILE" >&2
+  exit 1
+fi
+
+BROWSER_BIN=""
+for candidate in chromium chromium-browser google-chrome google-chrome-stable; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    BROWSER_BIN="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$BROWSER_BIN" ]]; then
+  echo "omarchy-dev-tools: aucun navigateur Chromium/Chrome trouvé, ouverture via xdg-open." >&2
+  exec xdg-open "$INDEX_FILE"
+fi
+
+exec "$BROWSER_BIN" \
+  --app="file://$INDEX_FILE" \
+  --window-size=1000,680 \
+  --class=omarchy-dev-tools \
+  --name=omarchy-dev-tools
