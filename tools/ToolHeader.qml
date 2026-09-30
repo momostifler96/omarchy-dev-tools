@@ -7,6 +7,7 @@ Column {
   id: root
   property string title: ""
   property string description: ""
+  property color fg: Color.popups.text
   default property alias content: inner.data
 
   spacing: Style.space(6)
@@ -23,7 +24,7 @@ Column {
   Text {
     visible: root.description !== ""
     text: root.description
-    color: Style.muted
+    color: Color.muted
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     wrapMode: Text.WordWrap

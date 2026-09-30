@@ -9,7 +9,8 @@ Button {
   property string value: ""
   property color fg: Color.popups.text
 
-  text: copied ? "Copié ✓" : "Copier"
+  property string label: "Copier"
+  text: copied ? "Copié ✓" : root.label
   foreground: copied ? Color.accent : root.fg
   fontFamily: Style.font.family
   fontSize: Style.font.caption
