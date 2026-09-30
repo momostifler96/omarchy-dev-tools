@@ -477,6 +477,130 @@ registerTool({
 });
 
 registerTool({
+  id: "tailwind-palette",
+  name: "Palette Tailwind",
+  category: "Design",
+  render(root) {
+    root.innerHTML = `
+      <h2>Générateur de palette Tailwind</h2>
+      <p class="desc">
+        Génère les 11 nuances (50 → 950) d'une couleur de base, façon
+        <a href="https://uicolors.app/generate" target="_blank" rel="noopener" style="color:var(--accent)">uicolors.app</a>.
+        La nuance 500 correspond à la couleur saisie.
+      </p>
+      <div class="row">
+        <div>
+          <label>Couleur de base</label>
+          <input type="text" id="tw-hex" placeholder="#ccae12" value="#ccae12" />
+        </div>
+        <div>
+          <label>Nom (pour l'export)</label>
+          <input type="text" id="tw-name" placeholder="brand" value="brand" />
+        </div>
+      </div>
+      <button class="action" id="tw-run">Générer</button>
+
+      <div id="tw-swatches" style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap;"></div>
+
+      <label>Config Tailwind (tailwind.config.js)</label>
+      <div class="result" id="tw-config"></div>
+      <button class="ghost" id="tw-copy-config">Copier la config</button>
+
+      <label>Variables CSS</label>
+      <div class="result" id="tw-css"></div>
+      <button class="ghost" id="tw-copy-css">Copier le CSS</button>
+    `;
+
+    const SHADES = [
+      { key: "50",  mix: "white", amount: 0.95 },
+      { key: "100", mix: "white", amount: 0.90 },
+      { key: "200", mix: "white", amount: 0.75 },
+      { key: "300", mix: "white", amount: 0.60 },
+      { key: "400", mix: "white", amount: 0.30 },
+      { key: "500", mix: "base",  amount: 0 },
+      { key: "600", mix: "black", amount: 0.10 },
+      { key: "700", mix: "black", amount: 0.25 },
+      { key: "800", mix: "black", amount: 0.40 },
+      { key: "900", mix: "black", amount: 0.55 },
+      { key: "950", mix: "black", amount: 0.75 },
+    ];
+
+    function hexToRgb(hex) {
+      hex = hex.trim().replace("#", "");
+      if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+      if (!/^[0-9a-fA-F]{6}$/.test(hex)) throw new Error("hex invalide");
+      const n = parseInt(hex, 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function rgbToHex([r, g, b]) {
+      return "#" + [r, g, b].map(c => Math.round(Math.min(255, Math.max(0, c))).toString(16).padStart(2, "0")).join("");
+    }
+    function mix(base, target, amount) {
+      return base.map((c, i) => c + (target[i] - c) * amount);
+    }
+    function relativeLuminance([r, g, b]) {
+      const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    }
+    function textColorFor(rgb) {
+      return relativeLuminance(rgb) > 0.4 ? "#14151a" : "#f5f5f7";
+    }
+
+    function generate(baseHex) {
+      const base = hexToRgb(baseHex);
+      const white = [255, 255, 255], black = [0, 0, 0];
+      return SHADES.map(s => {
+        const rgb = s.mix === "base" ? base : mix(base, s.mix === "white" ? white : black, s.amount);
+        return { key: s.key, hex: rgbToHex(rgb), rgb: rgb.map(Math.round) };
+      });
+    }
+
+    const hexIn = $("#tw-hex", root), nameIn = $("#tw-name", root);
+    const swatches = $("#tw-swatches", root), configOut = $("#tw-config", root), cssOut = $("#tw-css", root);
+
+    function run() {
+      let palette;
+      try { palette = generate(hexIn.value); }
+      catch (e) { swatches.innerHTML = `<div style="color:var(--err)">Couleur invalide: ${e.message}</div>`; return; }
+
+      const name = (nameIn.value.trim() || "brand").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+
+      swatches.innerHTML = palette.map(p => `
+        <div style="text-align:center;">
+          <div class="tw-swatch" data-hex="${p.hex}" title="Copier ${p.hex}"
+               style="width:64px;height:64px;border-radius:8px;border:1px solid var(--border);
+                      background:${p.hex};display:flex;align-items:flex-end;justify-content:center;
+                      padding-bottom:4px;cursor:pointer;color:${textColorFor(p.rgb)};
+                      font-size:10px;font-family:monospace;">${p.key}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">${p.hex}</div>
+        </div>
+      `).join("");
+
+      swatches.querySelectorAll(".tw-swatch").forEach(el => {
+        el.onclick = () => copyToClipboard(el.dataset.hex);
+      });
+
+      configOut.textContent =
+        `${name}: {\n` +
+        palette.map(p => `  ${p.key}: '${p.hex}',`).join("\n") +
+        `\n},`;
+
+      cssOut.textContent =
+        `:root {\n` +
+        palette.map(p => `  --color-${name}-${p.key}: ${p.hex};`).join("\n") +
+        `\n}`;
+    }
+
+    [hexIn, nameIn].forEach(el => el.addEventListener("input", run));
+    $("#tw-run", root).onclick = run;
+    $("#tw-copy-config", root).onclick = () => copyToClipboard(configOut.textContent);
+    $("#tw-copy-css", root).onclick = () => copyToClipboard(cssOut.textContent);
+
+    run();
+  }
+});
+
+registerTool({
   id: "timestamp",
   name: "Convertisseur Timestamp",
   category: "Date & heure",

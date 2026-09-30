@@ -6,6 +6,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- Générateur de palette Tailwind (façon uicolors.app) : à partir d'une couleur de
+  base, génère les 11 nuances 50→950 avec aperçu, export config
+  `tailwind.config.js` et variables CSS.
 - Gestionnaire de vhosts locaux (`bin/omarchy-vhost`) : ajoute/retire/liste des vhosts
   (`/etc/hosts` + reverse proxy nginx optionnel).
 - Support HTTPS pour les vhosts (`--https`) : certificat local via `mkcert` si
