@@ -24,7 +24,7 @@ Column {
   Text {
     visible: root.description !== ""
     text: root.description
-    color: Color.muted
+    color: Util.alpha(Color.popups.text, 0.7)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     wrapMode: Text.WordWrap

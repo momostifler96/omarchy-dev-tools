@@ -33,14 +33,14 @@ Column {
       id: area
       color: root.fg
       placeholderText: root.placeholder
-      placeholderTextColor: Color.muted
+      placeholderTextColor: Util.alpha(Color.popups.text, 0.5)
       wrapMode: TextArea.Wrap
       font.family: Style.font.family
       font.pixelSize: Style.font.bodySmall
       background: Rectangle {
         color: Util.alpha(Color.popups.background, 0.6)
         border.width: Style.normalBorderWidth
-        border.color: area.activeFocus ? Color.accent : Color.muted
+        border.color: area.activeFocus ? Color.accent : Util.alpha(Color.popups.text, 0.3)
         radius: Style.cornerRadius
       }
     }

@@ -81,7 +81,7 @@ ToolHeader {
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           text: swatchCol.modelData.hex
-          color: Color.muted
+          color: Util.alpha(Color.popups.text, 0.7)
           font.family: "monospace"
           font.pixelSize: 9
         }
@@ -92,7 +92,7 @@ ToolHeader {
   Text {
     visible: root.palette.length > 0
     text: "Astuce: clique sur une nuance pour copier son hex."
-    color: Color.muted
+    color: Util.alpha(Color.popups.text, 0.7)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
   }
