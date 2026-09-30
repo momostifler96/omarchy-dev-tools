@@ -1,13 +1,16 @@
 # Omarchy Dev Tools
 
 Boîte à outils développeur façon [it-tools.tech](https://it-tools.tech), packagée comme
-plugin [Omarchy](https://omarchy.org) (Hyprland/Arch) : accessible instantanément via un
-raccourci clavier et une icône dans la barre du haut (Waybar). 100 % local, aucune
-requête réseau pour les outils de conversion/texte/crypto.
+plugin [Omarchy](https://omarchy.org) (Hyprland/Arch) : **panneau natif QML** du shell
+Omarchy, ouvert en un clic sur l'icône `</>` de la barre du haut (toggle, Échap pour
+fermer). 100 % local, aucune requête réseau pour les outils de conversion/texte/crypto.
 
-- **Aucun build requis** : HTML/CSS/JS vanilla en page unique, ouverte directement par le navigateur.
-- **Aucune dépendance runtime** pour les 13 outils utilitaires.
-- Deux outils optionnels (`omarchy-vhost`, `omarchy-ngrok`) pilotent des actions système réelles et ont leurs propres prérequis (voir plus bas).
+- **Panneau natif** : QML/Quickshell comme les panels du shell — pas de fenêtre
+  navigateur, pas de webview.
+- **Aucune dépendance runtime** pour les 16 outils utilitaires (les 5 outils réseau
+  ont leurs propres prérequis, voir plus bas).
+- **Version web de secours** : `src/index.html` (page HTML autonome) reste ouvrable
+  via la CLI `omarchy-dev-tools`.
 
 ---
 
@@ -41,9 +44,10 @@ requête réseau pour les outils de conversion/texte/crypto.
 | Date & heure | Convertisseur timestamp Unix, explicateur d'expression cron |
 | Réseau local | Gestionnaire de vhosts (`omarchy-vhost`), exposition via ngrok (`omarchy-ngrok`) |
 
-D'autres outils d'it-tools.tech (QR code, chiffrement, conversion de fichiers…) peuvent
-être ajoutés ensuite en suivant le pattern `registerTool({...})` dans `src/index.html`
-(voir [Développement / contribuer](#développement--contribuer)).
+D'autres outils peuvent être ajoutés en créant un fichier `tools/MonOutil.qml`
+(avec `Helpers.js` pour la logique pure) et en l'enregistrant dans `toolRegistry`
+de `Panel.qml` — et, pour la version web, via `registerTool({...})` dans
+`src/index.html` (voir [Développement / contribuer](#développement--contribuer)).
 
 ---
 
@@ -51,7 +55,8 @@ D'autres outils d'it-tools.tech (QR code, chiffrement, conversion de fichiers…
 
 Obligatoires pour l'app elle-même :
 
-- **Omarchy** (Hyprland + Waybar) — ou tout environnement Hyprland équivalent.
+- **Omarchy** (Hyprland + shell Omarchy) — ou tout environnement Hyprland équivalent
+  (dans ce cas, utilise l'installation manuelle + le raccourci clavier).
 - **Bash** (scripts d'installation et launchers).
 - Un navigateur en mode app : **Chromium**, **chromium-browser**, **google-chrome** ou
   **google-chrome-stable** (le premier trouvé dans le `PATH` est utilisé). Sans eux,
@@ -72,40 +77,49 @@ build, tout le code est prêt à l'emploi.
 
 ## Installation
 
+Le plugin est au [format plugin Omarchy](https://omarchy.org) (manifest `manifest.json`
++ widget QML), donc il s'installe comme n'importe quel plugin communautaire :
+
 ```bash
-git clone https://github.com/momostifler96/omarchy-dev-tools.git
-cd omarchy-dev-tools
+omarchy plugin add https://github.com/momostifler96/omarchy-dev-tools
+```
+
+Puis active le widget dans la barre :
+
+```bash
+omarchy plugin enable momoledev.dev-tools right
+```
+
+Optionnel — les CLI du terminal (`omarchy-dev-tools` en ligne de commande,
+`omarchy-vhost`, `omarchy-ngrok`) et un raccourci clavier :
+
+```bash
+cd ~/.config/omarchy/plugins/momoledev.dev-tools
 ./bin/install.sh
 ```
 
-`install.sh` est idempotent (tu peux le relancer sans risque) et fait, dans l'ordre :
+Puis ajoute dans `~/.config/hypr/bindings.lua` :
 
-1. **App + launcher** — copie `src/` dans `~/.local/share/omarchy-dev-tools/` et génère
-   `~/.local/bin/omarchy-dev-tools` (lance le navigateur en mode `--app`, fenêtre
-   dédiée sans onglets ni barre d'adresse).
-2. **CLI complémentaires** — copie `omarchy-vhost` et `omarchy-ngrok` dans
-   `~/.local/bin/`.
-3. **Raccourci clavier Hyprland** — copie `hypr/omarchy-dev-tools.conf` dans
-   `~/.config/hypr/plugins/` (bind `Super + T` + règles de fenêtre flottante/centrée) et
-   ajoute `source = ~/.config/hypr/plugins/*.conf` à `hyprland.conf` s'il n'y est pas déjà.
-4. **Module Waybar** — copie `waybar/omarchy-dev-tools.jsonc` dans
-   `~/.config/waybar/modules/` et affiche les 2 lignes à ajouter toi-même dans
-   `~/.config/waybar/config.jsonc` (volontairement manuel : on ne réécrit jamais ta
-   config Waybar existante pour éviter de la casser).
-
-À la fin du script, applique les changements :
-
-```bash
-hyprctl reload
-pkill -SIGUSR2 waybar
+```lua
+o.bind("SUPER + SHIFT + T", "Omarchy Dev Tools", "omarchy-dev-tools")
+o.window("omarchy-dev-tools", { float = true, center = true, size = "1000 680" })
 ```
 
-Si `~/.local/bin` n'est pas dans ton `PATH`, le script te le signale — ajoute alors à
-ton `~/.bashrc` / `~/.zshrc` :
+Installation manuelle équivalente (sans `omarchy plugin`) :
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+git clone https://github.com/momostifler96/omarchy-dev-tools.git ~/.config/omarchy/plugins/momoledev.dev-tools
 ```
+
+### Ce que fait chaque pièce
+
+- **`manifest.json` + `Widget.qml`** — le plugin shell Omarchy proprement dit : icône
+  `</>` dans la barre du haut, clic = ouverture de l'app. Géré par le shell
+  (hot-reload, activation/désactivation via `omarchy plugin ...`).
+- **`bin/install.sh`** (optionnel) — copie les 3 binaires dans `~/.local/bin/`.
+  Idempotent, tu peux le relancer sans risque.
+- **`bin/uninstall.sh`** (optionnel) — retire les binaires ; le widget lui-même se
+  retire avec `omarchy plugin remove momoledev.dev-tools`.
 
 ### Pourquoi il n'y a pas de "build" ?
 
@@ -118,11 +132,10 @@ que **copier des fichiers**, pas les compiler.
 ## Vérifier l'installation
 
 ```bash
+omarchy plugin list | grep dev-tools       # plugin découvert/activé
 command -v omarchy-dev-tools && echo OK   # launcher présent dans le PATH
 command -v omarchy-vhost && echo OK
 command -v omarchy-ngrok && echo OK
-ls ~/.config/hypr/plugins/omarchy-dev-tools.conf
-ls ~/.config/waybar/modules/omarchy-dev-tools.jsonc
 ```
 
 Puis teste le lancement direct (sans passer par le raccourci) :
@@ -138,9 +151,9 @@ Une fenêtre flottante centrée (1000×680) doit s'ouvrir avec la sidebar d'outi
 ## Mettre à jour
 
 ```bash
-cd omarchy-dev-tools
-git pull
-./bin/install.sh   # réinstalle par-dessus (écrase l'app + les CLI, pas ta config Waybar)
+omarchy plugin update momoledev.dev-tools   # si installé via git
+# ou : git pull dans ~/.config/omarchy/plugins/momoledev.dev-tools
+./bin/install.sh                            # réinstalle les CLI par-dessus
 ```
 
 ---
@@ -148,22 +161,21 @@ git pull
 ## Désinstaller
 
 ```bash
-./bin/uninstall.sh
+omarchy plugin remove momoledev.dev-tools   # retire le widget + le clone
+./bin/uninstall.sh                          # retire les CLI (si install.sh a été lancé)
 ```
 
-Retire le launcher, les CLI, les données de l'app et les fichiers de config copiés
-(`hypr/plugins/omarchy-dev-tools.conf`, `waybar/modules/omarchy-dev-tools.jsonc`). Les
-vhosts déjà créés dans `/etc/hosts`/nginx ne sont **pas** retirés automatiquement — fais-le
-avant, si besoin, avec `sudo omarchy-vhost remove <domaine>` pour chacun. Les étapes
-manuelles restantes (retirer l'entrée Waybar, `hyprctl reload`, `pkill -SIGUSR2 waybar`)
-sont rappelées à la fin du script.
+Les vhosts déjà créés dans `/etc/hosts`/nginx ne sont **pas** retirés automatiquement —
+fais-le avant, si besoin, avec `sudo omarchy-vhost remove <domaine>` pour chacun. Le
+raccourci `o.bind("SUPER + SHIFT + T", ...)` dans `~/.config/hypr/bindings.lua` est à
+retirer à la main.
 
 ---
 
 ## Utilisation
 
-- **Clavier** : `Super + T` ouvre la fenêtre d'outils.
-- **Souris** : clique sur l'icône 󰙯 dans la barre du haut (Waybar).
+- **Barre** : clique sur l'icône `</>` dans la barre du haut (shell Omarchy).
+- **Clavier** : `Super + Shift + T` ouvre la fenêtre d'outils (si le raccourci a été ajouté).
 - `Échap` ferme la fenêtre.
 - La sidebar a un champ de recherche pour filtrer les outils par nom.
 - Le dernier outil ouvert est mémorisé (`localStorage`) et réaffiché à la prochaine ouverture.
@@ -235,15 +247,12 @@ terminal.
 
 ## Configuration
 
-- **Changer le raccourci clavier** : édite `~/.config/hypr/plugins/omarchy-dev-tools.conf`
-  (ligne `bind = SUPER, T, exec, omarchy-dev-tools`), puis `hyprctl reload`. Pour que le
-  changement survive à une réinstallation, modifie plutôt `hypr/omarchy-dev-tools.conf`
-  dans le dépôt avant de relancer `install.sh`.
-- **Déplacer l'icône Waybar** : dans `~/.config/waybar/config.jsonc`, `"custom/omarchy-dev-tools"`
-  peut être placé dans `modules-left`, `modules-center` ou `modules-right`.
-- **Changer la taille de fenêtre** : ajuste `--window-size` dans le launcher généré
-  (`~/.local/bin/omarchy-dev-tools`) et les valeurs `size` dans
-  `hypr/omarchy-dev-tools.conf` (`windowrulev2 = size ...`).
+- **Changer le raccourci clavier** : édite la ligne `o.bind("SUPER + SHIFT + T", ...)`
+  dans `~/.config/hypr/bindings.lua` (Hyprland recharge automatiquement).
+- **Déplacer l'icône** : `omarchy bar move momoledev.dev-tools --section left|center|right`.
+- **Changer la taille de fenêtre** : ajuste `--window-size` dans
+  `~/.local/bin/omarchy-dev-tools` et la valeur `size` du `o.window(...)` dans
+  `bindings.lua`.
 
 ---
 
@@ -251,8 +260,8 @@ terminal.
 
 | Symptôme | Cause probable | Solution |
 |---|---|---|
-| `Super + T` ne fait rien | Hyprland n'a pas rechargé sa config | `hyprctl reload` ; vérifie que `hyprland.conf` contient bien `source = ~/.config/hypr/plugins/*.conf` |
-| L'icône n'apparaît pas dans Waybar | Module pas ajouté à `config.jsonc` | Relis l'étape 4 de [Installation](#installation), puis `pkill -SIGUSR2 waybar` |
+| L'icône `</>` n'apparaît pas dans la barre | Widget pas activé | `omarchy plugin list \| grep dev-tools`, puis `omarchy plugin enable momoledev.dev-tools right` |
+| `Super + Shift + T` ne fait rien | Raccourci pas ajouté à `bindings.lua` | Relis [Installation](#installation) ; Hyprland recharge tout seul `bindings.lua` |
 | `omarchy-dev-tools: command not found` | `~/.local/bin` absent du `PATH` | Ajoute `export PATH="$HOME/.local/bin:$PATH"` à ton shell rc, puis ouvre un nouveau terminal |
 | L'app s'ouvre dans un onglet de navigateur classique (pas en fenêtre dédiée) | Aucun binaire Chromium/Chrome trouvé | Installe `chromium` (ou `google-chrome`), sinon c'est `xdg-open` qui prend le relais |
 | `omarchy-vhost: cette commande nécessite sudo` | `add`/`remove` appelés sans `sudo` | Préfixe la commande par `sudo` |
@@ -267,19 +276,22 @@ terminal.
 ## Structure du projet
 
 ```
-plugin.json                       # manifest du plugin (nom, version, bindings)
+manifest.json                     # manifest plugin Omarchy (id, version, entry points)
+Widget.qml                        # widget de barre : icône </> + toggle du panel
+Panel.qml                         # panel natif : sidebar (recherche + outils) + zone outil
+Helpers.js                        # logique pure des outils (portage de src/index.html)
+tools/
+  ToolHeader.qml                  # en-tête titre/description + contenu d'un outil
+  DevTextField.qml, DevTextArea.qml, ResultBox.qml, CopyButton.qml   # composants partagés
+  *Tool.qml                       # un fichier par outil (16 outils)
 bin/
-  omarchy-dev-tools                # launcher de dev (référence ; install.sh en génère une copie adaptée)
+  omarchy-dev-tools                # version web de secours (chromium --app / xdg-open)
   omarchy-vhost                    # CLI : gestion des vhosts locaux (hosts + nginx)
   omarchy-ngrok                    # CLI : wrapper ngrok (expose un port, affiche le statut)
-  install.sh                       # installation (copie fichiers + config Hyprland/Waybar)
-  uninstall.sh                     # désinstallation
+  install.sh                       # installation optionnelle des CLI
+  uninstall.sh                     # désinstallation des CLI
 src/
-  index.html                       # l'app : UI + logique de tous les outils (page unique)
-hypr/
-  omarchy-dev-tools.conf           # bind clavier + règles de fenêtre Hyprland
-waybar/
-  omarchy-dev-tools.jsonc          # module Waybar (icône + click handler)
+  index.html                       # version web autonome (secours), mêmes outils
 README.md
 ```
 
@@ -287,11 +299,27 @@ README.md
 
 ## Développement / contribuer
 
-Aucune étape de build : édite `src/index.html` et rafraîchis la page (`F5`) dans le
-navigateur pour voir le résultat — inutile même de réinstaller pendant le développement,
-tu peux ouvrir le fichier directement :
+### Panel natif (principal)
+
+Le hot-reload du shell Omarchy s'applique : éditer un fichier sous
+`~/.config/omarchy/plugins/momoledev.dev-tools/` recharge le plugin automatiquement.
+Pendant le développement, travaille directement dans le dépôt puis synchronise :
 
 ```bash
+rsync -a --exclude .git ~/projects/perso/omarchy-dev-tools/ ~/.config/omarchy/plugins/momoledev.dev-tools/
+```
+
+- **Logique d'un outil** : fonctions pures dans `Helpers.js` (entrée → sortie).
+- **UI d'un outil** : un fichier `tools/MonOutil.qml` racine `ToolHeader`, composants
+  partagés `DevTextField` / `DevTextArea` / `ResultBox` / `CopyButton`.
+- **Enregistrement** : ajouter une entrée `{ id, name, category, file }` dans
+  `toolRegistry` de `Panel.qml`.
+- Journal du shell : `journalctl --user -f | grep -i dev-tools` pour voir les
+  erreurs QML en live.
+
+### Version web (secours)
+
+`src/index.html` reste une page autonome sans build :
 xdg-open src/index.html
 # ou, en conditions proches de la prod :
 chromium --app="file://$(pwd)/src/index.html" --window-size=1000,680
