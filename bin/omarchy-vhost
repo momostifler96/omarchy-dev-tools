@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# omarchy-vhost — gère des vhosts locaux (entrée /etc/hosts + reverse proxy nginx optionnel).
+# omarchy-vhost — gère des vhosts locaux (entrée /etc/hosts + reverse proxy nginx,
+# avec HTTPS local optionnel via certificat mkcert ou autosigné).
 #
 # Usage:
-#   sudo omarchy-vhost add <domaine> <port> [--no-nginx]
+#   sudo omarchy-vhost add <domaine> <port> [--no-nginx] [--https]
 #   sudo omarchy-vhost remove <domaine>
 #   omarchy-vhost list
 set -euo pipefail
@@ -10,14 +11,20 @@ set -euo pipefail
 HOSTS_FILE="/etc/hosts"
 NGINX_AVAILABLE="/etc/nginx/sites-available"
 NGINX_ENABLED="/etc/nginx/sites-enabled"
+CERT_DIR="/etc/omarchy-vhost/certs"
 MARKER="# omarchy-vhost"
 
 usage() {
   cat >&2 <<EOF
 Usage:
-  sudo omarchy-vhost add <domaine> <port> [--no-nginx]
+  sudo omarchy-vhost add <domaine> <port> [--no-nginx] [--https]
   sudo omarchy-vhost remove <domaine>
   omarchy-vhost list
+
+Options de 'add':
+  --no-nginx   N'ajoute que l'entrée /etc/hosts (pas de reverse proxy nginx)
+  --https      Sert le vhost en HTTPS (certificat local mkcert si disponible,
+               sinon certificat autosigné) ; le port 80 redirige vers 443.
 EOF
   exit 1
 }
@@ -33,6 +40,43 @@ has_nginx() {
   command -v nginx >/dev/null 2>&1 && [[ -d "$NGINX_AVAILABLE" ]]
 }
 
+# Propose l'installation de nginx s'il manque, avec confirmation explicite de
+# l'utilisateur (jamais d'installation silencieuse). Retourne 0 si nginx est
+# disponible après coup (déjà présent ou installé), 1 sinon (refus/échec).
+offer_install_nginx() {
+  if has_nginx; then return 0; fi
+
+  if ! command -v pacman >/dev/null 2>&1; then
+    echo "  ! nginx absent et pacman introuvable (environnement non-Arch ?) : installe-le manuellement." >&2
+    return 1
+  fi
+
+  if [[ ! -t 0 ]]; then
+    echo "  ! nginx n'est pas installé. Lance manuellement: sudo pacman -S nginx" >&2
+    return 1
+  fi
+
+  echo "  ? nginx n'est pas installé, requis pour le reverse proxy du vhost."
+  read -r -p "    Installer nginx maintenant via 'pacman -S nginx' ? [o/N] " reply
+  case "$reply" in
+    o|O|oui|Oui|y|Y|yes|Yes)
+      echo "  … installation de nginx (pacman -S --noconfirm nginx)"
+      if pacman -S --noconfirm nginx; then
+        mkdir -p "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+        echo "  + nginx installé."
+        return 0
+      else
+        echo "  ! échec de l'installation de nginx." >&2
+        return 1
+      fi
+      ;;
+    *)
+      echo "  - installation de nginx refusée, le vhost restera limité à /etc/hosts."
+      return 1
+      ;;
+  esac
+}
+
 reload_nginx() {
   if nginx -t 2>/dev/null; then
     if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
@@ -45,10 +89,56 @@ reload_nginx() {
   fi
 }
 
+# Génère (si besoin) un certificat local pour $domain dans ${CERT_DIR}/${domain}/.
+# Préfère mkcert (certificat de confiance, sans avertissement navigateur) ; à
+# défaut, génère un certificat autosigné avec openssl.
+ensure_cert() {
+  local domain="$1"
+  local dir="${CERT_DIR}/${domain}"
+  local cert="${dir}/cert.pem" key="${dir}/key.pem"
+
+  if [[ -f "$cert" && -f "$key" ]]; then
+    echo "  = certificat existant réutilisé: ${dir}"
+    echo "$cert:$key"
+    return
+  fi
+
+  mkdir -p "$dir"
+
+  if command -v mkcert >/dev/null 2>&1; then
+    mkcert -cert-file "$cert" -key-file "$key" "$domain" >/dev/null
+    echo "  + certificat mkcert généré (root CA locale de confiance): ${dir}"
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
+      -subj "/CN=${domain}" \
+      -addext "subjectAltName=DNS:${domain}" \
+      -keyout "$key" -out "$cert" >/dev/null 2>&1
+    echo "  + certificat autosigné généré: ${dir}"
+    echo "    (le navigateur affichera un avertissement de confiance tant que tu ne"
+    echo "     l'importes pas manuellement, ou installe mkcert pour l'éviter:"
+    echo "     https://github.com/FiloSottile/mkcert)"
+  else
+    echo "omarchy-vhost: ni mkcert ni openssl trouvés, impossible de générer un certificat HTTPS." >&2
+    exit 1
+  fi
+
+  echo "$cert:$key"
+}
+
 cmd_add() {
-  local domain="${1:?domaine manquant}" port="${2:?port manquant}"
-  local use_nginx=1
-  [[ "${3:-}" == "--no-nginx" ]] && use_nginx=0
+  local domain="" port="" use_nginx=1 use_https=0
+  local positional=()
+
+  for arg in "$@"; do
+    case "$arg" in
+      --no-nginx) use_nginx=0 ;;
+      --https) use_https=1 ;;
+      *) positional+=("$arg") ;;
+    esac
+  done
+
+  domain="${positional[0]:?domaine manquant}"
+  port="${positional[1]:?port manquant}"
 
   require_root
 
@@ -59,9 +149,51 @@ cmd_add() {
     echo "  + ${HOSTS_FILE}: 127.0.0.1 ${domain}"
   fi
 
+  if [[ "$use_nginx" -eq 1 ]] && ! has_nginx; then
+    offer_install_nginx || use_nginx=0
+  fi
+
   if [[ "$use_nginx" -eq 1 ]] && has_nginx; then
     local conf="${NGINX_AVAILABLE}/${domain}.conf"
-    cat > "$conf" <<EOF
+
+    if [[ "$use_https" -eq 1 ]]; then
+      local pair cert key
+      pair="$(ensure_cert "$domain")"
+      cert="${pair%%:*}"
+      key="${pair##*:}"
+
+      cat > "$conf" <<EOF
+${MARKER}
+server {
+    listen 80;
+    server_name ${domain};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${domain};
+
+    ssl_certificate ${cert};
+    ssl_certificate_key ${key};
+
+    location / {
+        proxy_pass http://127.0.0.1:${port};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+      ln -sf "$conf" "${NGINX_ENABLED}/${domain}.conf"
+      reload_nginx
+      echo "  + nginx: reverse proxy https://${domain} -> 127.0.0.1:${port} (http redirige vers https)"
+    else
+      cat > "$conf" <<EOF
 ${MARKER}
 server {
     listen 80;
@@ -79,12 +211,14 @@ server {
     }
 }
 EOF
-    ln -sf "$conf" "${NGINX_ENABLED}/${domain}.conf"
-    reload_nginx
-    echo "  + nginx: reverse proxy http://${domain} -> 127.0.0.1:${port}"
+      ln -sf "$conf" "${NGINX_ENABLED}/${domain}.conf"
+      reload_nginx
+      echo "  + nginx: reverse proxy http://${domain} -> 127.0.0.1:${port}"
+    fi
   elif [[ "$use_nginx" -eq 1 ]]; then
     echo "  ! nginx non détecté, vhost ajouté uniquement dans ${HOSTS_FILE}."
     echo "    Pointe ton serveur sur le port ${port} ; accès direct: http://${domain}:${port}"
+    [[ "$use_https" -eq 1 ]] && echo "    (--https ignoré: nécessite nginx pour terminer le TLS)"
   fi
 
   echo "==> vhost '${domain}' prêt."
@@ -111,6 +245,11 @@ cmd_remove() {
     fi
   fi
 
+  if [[ -d "${CERT_DIR}/${domain}" ]]; then
+    rm -rf "${CERT_DIR}/${domain}"
+    echo "  - certificat local retiré: ${CERT_DIR}/${domain}"
+  fi
+
   echo "==> vhost '${domain}' retiré."
 }
 
@@ -127,7 +266,9 @@ cmd_list() {
     for f in "$NGINX_AVAILABLE"/*.conf; do
       [[ -e "$f" ]] || continue
       if head -1 "$f" | grep -q "^${MARKER}\$"; then
-        echo "  - $(basename "$f" .conf)"
+        local scheme="http"
+        grep -q "listen 443" "$f" && scheme="https"
+        echo "  - $(basename "$f" .conf)  [${scheme}]"
         found=1
       fi
     done

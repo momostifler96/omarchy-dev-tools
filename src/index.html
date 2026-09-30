@@ -666,6 +666,15 @@ registerTool({
         <input type="checkbox" id="vh-nginx" checked style="width:auto" />
         Configurer un reverse proxy nginx (sinon: juste l'entrée /etc/hosts)
       </label>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+        <input type="checkbox" id="vh-https" style="width:auto" />
+        Servir en HTTPS (certificat local, port 80 redirige vers 443)
+      </label>
+      <p class="desc" id="vh-https-note" style="display:none;margin-top:6px;">
+        Nécessite nginx. Utilise <code>mkcert</code> si installé (certificat de
+        confiance, sans avertissement navigateur), sinon génère un certificat
+        autosigné avec <code>openssl</code>.
+      </p>
 
       <label>Commande à exécuter</label>
       <div class="result" id="vh-add-cmd"></div>
@@ -674,7 +683,8 @@ registerTool({
       <label>Autres commandes utiles</label>
       <div class="result" id="vh-other-cmds"></div>
     `;
-    const domain = $("#vh-domain", root), port = $("#vh-port", root), useNginx = $("#vh-nginx", root);
+    const domain = $("#vh-domain", root), port = $("#vh-port", root);
+    const useNginx = $("#vh-nginx", root), useHttps = $("#vh-https", root), httpsNote = $("#vh-https-note", root);
     const addCmd = $("#vh-add-cmd", root), otherCmds = $("#vh-other-cmds", root);
 
     function safe(v, fallback) { return (v || "").trim() || fallback; }
@@ -682,13 +692,21 @@ registerTool({
     function update() {
       const d = safe(domain.value, "monapp.test");
       const p = safe(port.value, "3000");
-      const flag = useNginx.checked ? "" : " --no-nginx";
-      addCmd.textContent = `sudo omarchy-vhost add ${d} ${p}${flag}`;
+      if (!useNginx.checked) useHttps.checked = false;
+      useHttps.disabled = !useNginx.checked;
+      httpsNote.style.display = useHttps.checked ? "block" : "none";
+
+      const flags = [];
+      if (!useNginx.checked) flags.push("--no-nginx");
+      if (useHttps.checked) flags.push("--https");
+      const flagStr = flags.length ? " " + flags.join(" ") : "";
+
+      addCmd.textContent = `sudo omarchy-vhost add ${d} ${p}${flagStr}`;
       otherCmds.textContent =
         `omarchy-vhost list\nsudo omarchy-vhost remove ${d}`;
     }
-    [domain, port, useNginx].forEach(el => el.addEventListener("input", update));
-    useNginx.addEventListener("change", update);
+    [domain, port, useNginx, useHttps].forEach(el => el.addEventListener("input", update));
+    [useNginx, useHttps].forEach(el => el.addEventListener("change", update));
     update();
 
     $("#vh-copy-add", root).onclick = () => copyToClipboard(addCmd.textContent);
