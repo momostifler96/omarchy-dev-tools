@@ -45,8 +45,8 @@ Panel {
       try {
         var s = JSON.parse(text())
         if (s.lastTool) root.lastTool = s.lastTool
-        if (root.currentTool === "") root.selectTool(root.lastTool)
       } catch (e) {}
+      root.selectTool(root.lastTool)
     }
     onLoadFailed: function(error) { root.selectTool(root.lastTool) }
   }
@@ -264,8 +264,10 @@ Panel {
   }
 
   onOpenedChanged: {
-    if (opened && currentTool === "") selectTool(root.lastTool)
+    if (opened && currentTool === "") currentTool = root.lastTool
   }
 
-  Component.onCompleted: if (currentTool === "") selectTool(root.lastTool)
+  // Sélection initiale sans écrire l'état : sinon on écrase le fichier avant
+  // que FileView ne lise le dernier outil réellement utilisé.
+  Component.onCompleted: if (currentTool === "") currentTool = root.lastTool
 }
