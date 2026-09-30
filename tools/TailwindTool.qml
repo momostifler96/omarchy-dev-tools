@@ -81,7 +81,7 @@ ToolHeader {
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           text: swatchCol.modelData.hex
-          color: Style.muted
+          color: Color.muted
           font.family: "monospace"
           font.pixelSize: 9
         }
@@ -92,7 +92,7 @@ ToolHeader {
   Text {
     visible: root.palette.length > 0
     text: "Astuce: clique sur une nuance pour copier son hex."
-    color: Style.muted
+    color: Color.muted
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
   }
@@ -109,8 +109,8 @@ ToolHeader {
   Row {
     visible: root.palette.length > 0
     spacing: Style.space(8)
-    CopyButton { value: root.configOut; text: "Copier la config" }
-    CopyButton { value: root.cssOut; text: "Copier le CSS" }
+    CopyButton { value: root.configOut; label: "Copier la config" }
+    CopyButton { value: root.cssOut; label: "Copier le CSS" }
   }
 
   Text {
