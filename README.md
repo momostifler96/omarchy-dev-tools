@@ -37,7 +37,7 @@ requête réseau pour les outils de conversion/texte/crypto.
 | Sécurité | JWT decoder, Hash (SHA-1/256/384/512) |
 | Générateurs | UUID v4, Lorem Ipsum |
 | Texte & données | JSON formatter/minifier/validator, testeur regex, convertisseur de casse, comparateur de texte |
-| Design | Convertisseur de couleurs (HEX/RGB/HSL) |
+| Design | Convertisseur de couleurs (HEX/RGB/HSL), générateur de palette Tailwind (50→950) |
 | Date & heure | Convertisseur timestamp Unix, explicateur d'expression cron |
 | Réseau local | Gestionnaire de vhosts (`omarchy-vhost`), exposition via ngrok (`omarchy-ngrok`) |
 
