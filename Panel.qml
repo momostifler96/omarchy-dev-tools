@@ -164,7 +164,7 @@ Panel {
                   Text {
                     visible: entryCol.isFirstOfCategory
                     text: entryCol.modelData.category
-                    color: Color.muted
+                    color: Util.alpha(Color.popups.text, 0.7)
                     font.family: Style.font.family
                     font.pixelSize: Style.font.caption
                     font.weight: Font.DemiBold

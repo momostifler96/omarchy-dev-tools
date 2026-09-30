@@ -8,7 +8,7 @@ Rectangle {
   property string kind: "neutral"   // "ok" | "err" | "neutral"
   property color fg: Color.popups.text
   readonly property color stateColor: kind === "err" ? Color.urgent
-                                    : kind === "ok" ? Color.accent : Color.muted
+                                    : kind === "ok" ? Color.accent : Util.alpha(Color.popups.text, 0.55)
 
   width: parent ? parent.width : 0
   implicitHeight: Math.max(Style.space(36), body.implicitHeight + Style.space(16))
@@ -33,7 +33,7 @@ Rectangle {
     anchors.centerIn: parent
     visible: root.text === ""
     text: "…"
-    color: Color.muted
+    color: Util.alpha(Color.popups.text, 0.7)
     font.family: "monospace"
     font.pixelSize: Style.font.caption
   }
