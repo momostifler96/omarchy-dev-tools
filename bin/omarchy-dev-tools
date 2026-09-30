@@ -4,11 +4,11 @@
 set -euo pipefail
 
 PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INDEX_FILE="$PLUGIN_DIR/src/index.html"
+INDEX_FILE="${1:-$PLUGIN_DIR/src/index.html}"
 
-if [[ ! -f "$INDEX_FILE" ]]; then
-  echo "omarchy-dev-tools: introuvable: $INDEX_FILE" >&2
-  exit 1
+# Accepte un chemin absolu ou une URL file:// déjà formée
+if [[ "$INDEX_FILE" != file://* ]]; then
+  INDEX_FILE="file://$INDEX_FILE"
 fi
 
 BROWSER_BIN=""
@@ -25,7 +25,7 @@ if [[ -z "$BROWSER_BIN" ]]; then
 fi
 
 exec "$BROWSER_BIN" \
-  --app="file://$INDEX_FILE" \
+  --app="$INDEX_FILE" \
   --window-size=1000,680 \
   --class=omarchy-dev-tools \
   --name=omarchy-dev-tools
