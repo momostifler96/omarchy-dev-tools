@@ -184,18 +184,32 @@ sudo omarchy-vhost add monapp.test 3000
 # Créer un vhost sans toucher à nginx (entrée /etc/hosts uniquement)
 sudo omarchy-vhost add monapp.test 3000 --no-nginx
 
-# Lister les vhosts gérés par omarchy-vhost
+# Créer un vhost en HTTPS (certificat local, port 80 redirige vers 443)
+sudo omarchy-vhost add monapp.test 3000 --https
+
+# Lister les vhosts gérés par omarchy-vhost (affiche le schéma http/https)
 omarchy-vhost list
 
-# Retirer un vhost (hosts + config nginx associée)
+# Retirer un vhost (hosts + config nginx + certificat associés)
 sudo omarchy-vhost remove monapp.test
 ```
 
 Ce que fait `add` :
 - ajoute `127.0.0.1 <domaine>` à `/etc/hosts` (marqué `# omarchy-vhost` pour un retrait propre) ;
-- si `nginx` est installé, écrit `/etc/nginx/sites-available/<domaine>.conf` (reverse
-  proxy vers `127.0.0.1:<port>`, support WebSocket inclus), l'active dans
-  `sites-enabled/`, teste la config (`nginx -t`) puis recharge nginx.
+- si `nginx` **n'est pas** installé (et que `--no-nginx` n'est pas passé), demande une
+  confirmation explicite avant de l'installer (`sudo pacman -S nginx`) — jamais
+  d'installation silencieuse ; en cas de refus ou d'échec, le vhost reste limité à
+  l'entrée `/etc/hosts` ;
+- si `nginx` est disponible (déjà présent ou installé après confirmation), écrit
+  `/etc/nginx/sites-available/<domaine>.conf` (reverse proxy vers `127.0.0.1:<port>`,
+  support WebSocket inclus), l'active dans `sites-enabled/`, teste la config
+  (`nginx -t`) puis recharge nginx ;
+- avec `--https` : génère (si besoin) un certificat local dans
+  `/etc/omarchy-vhost/certs/<domaine>/` — via [`mkcert`](https://github.com/FiloSottile/mkcert)
+  si installé (certificat de confiance, sans avertissement navigateur), sinon un
+  certificat autosigné via `openssl` (avertissement navigateur tant qu'il n'est pas
+  importé manuellement). Le vhost écoute alors en HTTPS sur le 443, et le port 80
+  redirige automatiquement vers HTTPS. Nécessite nginx (ignoré avec `--no-nginx`).
 
 `add` et `remove` nécessitent `sudo` (écriture système) ; `list` ne le nécessite pas.
 
@@ -242,7 +256,9 @@ terminal.
 | `omarchy-dev-tools: command not found` | `~/.local/bin` absent du `PATH` | Ajoute `export PATH="$HOME/.local/bin:$PATH"` à ton shell rc, puis ouvre un nouveau terminal |
 | L'app s'ouvre dans un onglet de navigateur classique (pas en fenêtre dédiée) | Aucun binaire Chromium/Chrome trouvé | Installe `chromium` (ou `google-chrome`), sinon c'est `xdg-open` qui prend le relais |
 | `omarchy-vhost: cette commande nécessite sudo` | `add`/`remove` appelés sans `sudo` | Préfixe la commande par `sudo` |
-| `omarchy-vhost` ne configure pas nginx | `nginx` absent ou `--no-nginx` passé | Installe `nginx`, ou omets `--no-nginx` |
+| `omarchy-vhost` ne configure pas nginx | `nginx` absent et installation refusée, ou `--no-nginx` passé | Relance et réponds `o` à la question d'installation, ou installe `nginx` toi-même (`sudo pacman -S nginx`) |
+| `omarchy-vhost` ne propose pas d'installer nginx | Commande lancée sans terminal interactif (script, CI) ou `pacman` absent (hors Arch) | Installe `nginx` manuellement puis relance `omarchy-vhost add` |
+| HTTPS affiche un avertissement navigateur | Certificat autosigné (pas de `mkcert`) | Installe [`mkcert`](https://github.com/FiloSottile/mkcert) puis recrée le vhost (`remove` + `add --https`) |
 | L'onglet ngrok affiche "Agent ngrok injoignable" | `omarchy-ngrok`/`ngrok` pas lancé, ou tourne sur une autre machine/conteneur | Lance `omarchy-ngrok <port>` sur la même machine que le navigateur qui affiche l'app |
 | `ngrok` refuse de démarrer | Pas authentifié | `ngrok config add-authtoken <ton-token>` (compte gratuit sur ngrok.com) |
 
