@@ -6,6 +6,7 @@
   "author": "momoledev",
   "license": "MIT",
   "bin": "bin/omarchy-dev-tools",
+  "extraBins": ["bin/omarchy-vhost", "bin/omarchy-ngrok"],
   "install": "bin/install.sh",
   "uninstall": "bin/uninstall.sh",
   "keybinding": {

@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# omarchy-vhost — gère des vhosts locaux (entrée /etc/hosts + reverse proxy nginx optionnel).
+#
+# Usage:
+#   sudo omarchy-vhost add <domaine> <port> [--no-nginx]
+#   sudo omarchy-vhost remove <domaine>
+#   omarchy-vhost list
+set -euo pipefail
+
+HOSTS_FILE="/etc/hosts"
+NGINX_AVAILABLE="/etc/nginx/sites-available"
+NGINX_ENABLED="/etc/nginx/sites-enabled"
+MARKER="# omarchy-vhost"
+
+usage() {
+  cat >&2 <<EOF
+Usage:
+  sudo omarchy-vhost add <domaine> <port> [--no-nginx]
+  sudo omarchy-vhost remove <domaine>
+  omarchy-vhost list
+EOF
+  exit 1
+}
+
+require_root() {
+  if [[ "${EUID}" -ne 0 ]]; then
+    echo "omarchy-vhost: cette commande nécessite sudo." >&2
+    exit 1
+  fi
+}
+
+has_nginx() {
+  command -v nginx >/dev/null 2>&1 && [[ -d "$NGINX_AVAILABLE" ]]
+}
+
+reload_nginx() {
+  if nginx -t 2>/dev/null; then
+    if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+      systemctl reload nginx
+    else
+      nginx -s reload 2>/dev/null || true
+    fi
+  else
+    echo "omarchy-vhost: config nginx invalide, reload ignoré (vérifie avec: nginx -t)" >&2
+  fi
+}
+
+cmd_add() {
+  local domain="${1:?domaine manquant}" port="${2:?port manquant}"
+  local use_nginx=1
+  [[ "${3:-}" == "--no-nginx" ]] && use_nginx=0
+
+  require_root
+
+  if grep -qE "^[0-9.]+\s+${domain}(\s|\$)" "$HOSTS_FILE"; then
+    echo "omarchy-vhost: '${domain}' est déjà présent dans ${HOSTS_FILE}." >&2
+  else
+    echo "127.0.0.1 ${domain} ${MARKER}" >> "$HOSTS_FILE"
+    echo "  + ${HOSTS_FILE}: 127.0.0.1 ${domain}"
+  fi
+
+  if [[ "$use_nginx" -eq 1 ]] && has_nginx; then
+    local conf="${NGINX_AVAILABLE}/${domain}.conf"
+    cat > "$conf" <<EOF
+${MARKER}
+server {
+    listen 80;
+    server_name ${domain};
+
+    location / {
+        proxy_pass http://127.0.0.1:${port};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+    ln -sf "$conf" "${NGINX_ENABLED}/${domain}.conf"
+    reload_nginx
+    echo "  + nginx: reverse proxy http://${domain} -> 127.0.0.1:${port}"
+  elif [[ "$use_nginx" -eq 1 ]]; then
+    echo "  ! nginx non détecté, vhost ajouté uniquement dans ${HOSTS_FILE}."
+    echo "    Pointe ton serveur sur le port ${port} ; accès direct: http://${domain}:${port}"
+  fi
+
+  echo "==> vhost '${domain}' prêt."
+}
+
+cmd_remove() {
+  local domain="${1:?domaine manquant}"
+  require_root
+
+  if grep -q "${MARKER}\$" "$HOSTS_FILE" && grep -qE "\s${domain}\s.*${MARKER}\$" "$HOSTS_FILE"; then
+    sed -i "/\s${domain}\s.*${MARKER}\$/d" "$HOSTS_FILE"
+    echo "  - ${HOSTS_FILE}: entrée '${domain}' retirée"
+  else
+    echo "  ! aucune entrée gérée par omarchy-vhost trouvée pour '${domain}' dans ${HOSTS_FILE}" >&2
+  fi
+
+  if has_nginx; then
+    local removed=0
+    [[ -e "${NGINX_ENABLED}/${domain}.conf" ]] && rm -f "${NGINX_ENABLED}/${domain}.conf" && removed=1
+    [[ -e "${NGINX_AVAILABLE}/${domain}.conf" ]] && rm -f "${NGINX_AVAILABLE}/${domain}.conf" && removed=1
+    if [[ "$removed" -eq 1 ]]; then
+      reload_nginx
+      echo "  - nginx: config '${domain}' retirée"
+    fi
+  fi
+
+  echo "==> vhost '${domain}' retiré."
+}
+
+cmd_list() {
+  echo "Vhosts gérés par omarchy-vhost (${HOSTS_FILE}):"
+  if grep -q "${MARKER}\$" "$HOSTS_FILE" 2>/dev/null; then
+    grep "${MARKER}\$" "$HOSTS_FILE" | sed 's/^/  /'
+  else
+    echo "  (aucun)"
+  fi
+  if has_nginx; then
+    echo "Sites nginx gérés par omarchy-vhost:"
+    local found=0
+    for f in "$NGINX_AVAILABLE"/*.conf; do
+      [[ -e "$f" ]] || continue
+      if head -1 "$f" | grep -q "^${MARKER}\$"; then
+        echo "  - $(basename "$f" .conf)"
+        found=1
+      fi
+    done
+    [[ "$found" -eq 0 ]] && echo "  (aucun)"
+  fi
+}
+
+case "${1:-}" in
+  add) shift; cmd_add "$@" ;;
+  remove) shift; cmd_remove "$@" ;;
+  list) shift; cmd_list "$@" ;;
+  *) usage ;;
+esac
