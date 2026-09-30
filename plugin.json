@@ -1,0 +1,19 @@
+{
+  "name": "omarchy-dev-tools",
+  "version": "0.1.0",
+  "description": "Boîte à outils développeur façon it-tools.tech, intégrée à Omarchy (raccourci clavier Hyprland + icône Waybar).",
+  "homepage": "https://github.com/momostifler96/omarchy-dev-tools",
+  "author": "momoledev",
+  "license": "MIT",
+  "bin": "bin/omarchy-dev-tools",
+  "install": "bin/install.sh",
+  "uninstall": "bin/uninstall.sh",
+  "keybinding": {
+    "default": "SUPER, T",
+    "description": "Ouvre Omarchy Dev Tools"
+  },
+  "waybar": {
+    "module": "waybar/omarchy-dev-tools.jsonc",
+    "position": "modules-right"
+  }
+}
