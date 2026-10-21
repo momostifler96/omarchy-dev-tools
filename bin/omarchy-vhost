@@ -52,6 +52,17 @@ validate_port() {
 # Domaine échappé pour grep -E / sed (les points sont littéraux).
 domain_regex() { printf '%s' "${1//./\\.}"; }
 
+# Fichiers nginx dont omarchy-vhost est l'auteur : la config commence par le
+# marqueur, le lien de sites-enabled pointe sur cette config. Tout le reste
+# appartient à l'utilisateur et n'est jamais écrasé ni supprimé.
+is_managed_conf() {
+  [[ -f "$1" && ! -L "$1" && "$(head -n 1 "$1")" == "$MARKER" ]]
+}
+
+is_managed_link() { # lien conf
+  [[ -L "$1" && "$(readlink "$1")" == "$2" ]]
+}
+
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     echo "omarchy-vhost: cette commande nécessite sudo." >&2
@@ -178,6 +189,25 @@ cmd_add() {
 
   require_root
 
+  if [[ "$use_nginx" -eq 1 ]] && ! has_nginx; then
+    offer_install_nginx || use_nginx=0
+  fi
+
+  # Conflits vérifiés avant toute écriture : une config nginx existante qui
+  # n'a pas été créée par omarchy-vhost n'est jamais remplacée.
+  local conf="${NGINX_AVAILABLE}/${domain}.conf"
+  local link="${NGINX_ENABLED}/${domain}.conf"
+  if [[ "$use_nginx" -eq 1 ]] && has_nginx; then
+    if [[ -e "$conf" || -L "$conf" ]] && ! is_managed_conf "$conf"; then
+      echo "omarchy-vhost: ${conf} existe et n'a pas été créé par omarchy-vhost ; rien n'a été modifié." >&2
+      exit 1
+    fi
+    if [[ -e "$link" || -L "$link" ]] && ! is_managed_link "$link" "$conf"; then
+      echo "omarchy-vhost: ${link} existe et n'a pas été créé par omarchy-vhost ; rien n'a été modifié." >&2
+      exit 1
+    fi
+  fi
+
   if grep -qE "^[0-9.]+\s+$(domain_regex "$domain")(\s|\$)" "$HOSTS_FILE"; then
     echo "omarchy-vhost: '${domain}' est déjà présent dans ${HOSTS_FILE}." >&2
   else
@@ -185,13 +215,9 @@ cmd_add() {
     echo "  + ${HOSTS_FILE}: 127.0.0.1 ${domain}"
   fi
 
-  if [[ "$use_nginx" -eq 1 ]] && ! has_nginx; then
-    offer_install_nginx || use_nginx=0
-  fi
-
   if [[ "$use_nginx" -eq 1 ]] && has_nginx; then
-    local conf="${NGINX_AVAILABLE}/${domain}.conf"
-
+    # Le proxy n'écoute que sur la boucle locale (127.0.0.1, l'adresse mise
+    # dans /etc/hosts) : il n'est pas joignable depuis le réseau.
     if [[ "$use_https" -eq 1 ]]; then
       local pair cert key
       pair="$(ensure_cert "$domain")"
@@ -201,13 +227,13 @@ cmd_add() {
       cat > "$conf" <<EOF
 ${MARKER}
 server {
-    listen 80;
+    listen 127.0.0.1:80;
     server_name ${domain};
     return 301 https://\$host\$request_uri;
 }
 
 server {
-    listen 443 ssl;
+    listen 127.0.0.1:443 ssl;
     server_name ${domain};
 
     ssl_certificate ${cert};
@@ -225,14 +251,14 @@ server {
     }
 }
 EOF
-      ln -sf "$conf" "${NGINX_ENABLED}/${domain}.conf"
+      ln -sfn "$conf" "$link"
       reload_nginx
       echo "  + nginx: reverse proxy https://${domain} -> 127.0.0.1:${port} (http redirige vers https)"
     else
       cat > "$conf" <<EOF
 ${MARKER}
 server {
-    listen 80;
+    listen 127.0.0.1:80;
     server_name ${domain};
 
     location / {
@@ -247,7 +273,7 @@ server {
     }
 }
 EOF
-      ln -sf "$conf" "${NGINX_ENABLED}/${domain}.conf"
+      ln -sfn "$conf" "$link"
       reload_nginx
       echo "  + nginx: reverse proxy http://${domain} -> 127.0.0.1:${port}"
     fi
@@ -276,8 +302,18 @@ cmd_remove() {
 
   if has_nginx; then
     local removed=0
-    [[ -e "${NGINX_ENABLED}/${domain}.conf" ]] && rm -f "${NGINX_ENABLED}/${domain}.conf" && removed=1
-    [[ -e "${NGINX_AVAILABLE}/${domain}.conf" ]] && rm -f "${NGINX_AVAILABLE}/${domain}.conf" && removed=1
+    local conf="${NGINX_AVAILABLE}/${domain}.conf"
+    local link="${NGINX_ENABLED}/${domain}.conf"
+    if is_managed_link "$link" "$conf"; then
+      rm -f "$link" && removed=1
+    elif [[ -e "$link" || -L "$link" ]]; then
+      echo "  ! ${link} n'a pas été créé par omarchy-vhost : laissé intact" >&2
+    fi
+    if is_managed_conf "$conf"; then
+      rm -f "$conf" && removed=1
+    elif [[ -e "$conf" || -L "$conf" ]]; then
+      echo "  ! ${conf} n'a pas été créé par omarchy-vhost : laissé intact" >&2
+    fi
     if [[ "$removed" -eq 1 ]]; then
       reload_nginx
       echo "  - nginx: config '${domain}' retirée"
@@ -306,7 +342,7 @@ cmd_list() {
       [[ -e "$f" ]] || continue
       if head -1 "$f" | grep -q "^${MARKER}\$"; then
         local scheme="http"
-        grep -q "listen 443" "$f" && scheme="https"
+        grep -qE "listen [^;]*443" "$f" && scheme="https"
         echo "  - $(basename "$f" .conf)  [${scheme}]"
         found=1
       fi

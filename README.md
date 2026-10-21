@@ -104,11 +104,16 @@ Ce que fait `add` :
 
 - ajoute `127.0.0.1 <domaine>  # omarchy-vhost` à `/etc/hosts` ;
 - écrit `/etc/nginx/sites-available/<domaine>.conf` (proxy vers `127.0.0.1:<port>`,
-  WebSocket inclus), l'active dans `sites-enabled/`, vérifie `nginx -t` puis recharge ;
+  WebSocket inclus), l'active dans `sites-enabled/`, vérifie `nginx -t` puis recharge.
+  Le proxy écoute uniquement sur `127.0.0.1` (ports 80/443) : il n'est pas joignable
+  depuis le réseau ;
 - avec `--https`, crée un certificat dans `/etc/omarchy-vhost/certs/<domaine>/`
   (dossier `0700`, clé `0600`).
 
-`remove` ne retire que les entrées marquées `# omarchy-vhost` et les fichiers qu'il a créés.
+Si `/etc/nginx/sites-available/<domaine>.conf` ou `sites-enabled/<domaine>.conf` existe
+déjà sans avoir été créé par `omarchy-vhost` (première ligne `# omarchy-vhost`, lien vers
+cette config), `add` s'arrête sans rien modifier. `remove` ne retire que les entrées
+marquées `# omarchy-vhost` et les fichiers qu'il a créés ; les autres sont laissés intacts.
 Le domaine doit être un nom d'hôte en minuscules contenant un point (`monapp.test`) et le
 port un entier de 1 à 65535. Toute autre valeur est refusée avant la moindre écriture.
 

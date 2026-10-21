@@ -3,6 +3,16 @@
 Toutes les évolutions notables du projet sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.4.2] — 2026-10-21
+
+### Security
+- `omarchy-vhost` n'écrase ni ne supprime plus une config nginx qu'il n'a pas créée :
+  `add` s'arrête sans rien modifier si `sites-available/<domaine>.conf` n'a pas le
+  marqueur `# omarchy-vhost` ou si `sites-enabled/<domaine>.conf` n'est pas un lien vers
+  cette config ; `remove` laisse ces fichiers intacts.
+- Le reverse proxy écoute sur `127.0.0.1:80` / `127.0.0.1:443` au lieu de toutes les
+  interfaces : il n'est plus joignable depuis le réseau.
+
 ## [0.4.1] — 2026-10-21
 
 ### Security
