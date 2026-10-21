@@ -118,10 +118,13 @@ port un entier de 1 à 65535. Toute autre valeur est refusée avant la moindre �
 omarchy-ngrok 3000                                  # expose le port 3000
 omarchy-ngrok 3000 --domain=mondomaine.ngrok-free.app
 omarchy-ngrok status                                # tunnels actifs (API locale)
+omarchy-ngrok set-authtoken                         # enregistre l'authtoken (saisie masquée)
 ```
 
-L'outil **Exposer via ngrok** enregistre l'authtoken avec `ngrok config add-authtoken`
-(stocké par ngrok dans sa propre configuration) et affiche en direct les URL publiques
+L'outil **Exposer via ngrok** enregistre l'authtoken via `omarchy-ngrok set-authtoken`.
+Le token ne passe jamais en argument d'une commande, où les autres utilisateurs locaux
+pourraient le lire. Il est écrit directement dans `ngrok.yml` (mode `0600`), puis le
+fichier est validé par `ngrok config check`. L'outil affiche aussi en direct les URL publiques
 via l'API locale `http://127.0.0.1:4040`. Un tunnel ngrok rend le port accessible depuis
 Internet : n'exposez que ce que vous voulez publier.
 

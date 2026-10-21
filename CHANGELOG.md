@@ -3,6 +3,19 @@
 Toutes les évolutions notables du projet sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.4.1] — 2026-10-21
+
+### Security
+- L'authtoken ngrok n'est plus passé en argument (`ngrok config add-authtoken <token>`,
+  lisible par les autres utilisateurs dans `/proc/<pid>/cmdline`). Nouvelle commande
+  `omarchy-ngrok set-authtoken` : token lu dans l'environnement ou en saisie masquée,
+  écrit dans `ngrok.yml` en `0600` par remplacement atomique, validé par
+  `ngrok config check` (fichier inchangé si invalide).
+
+### Fixed
+- Outils vhost et ngrok : les messages d'erreur référençaient des collecteurs de sortie
+  inexistants (ReferenceError au lieu du message).
+
 ## [0.4.0] — 2026-10-21
 
 ### Security

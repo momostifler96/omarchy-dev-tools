@@ -3,7 +3,9 @@
 #
 # Usage:
 #   omarchy-ngrok <port> [args ngrok supplémentaires...]
-#   omarchy-ngrok status      # affiche les tunnels actifs (API locale ngrok)
+#   omarchy-ngrok status          # affiche les tunnels actifs (API locale ngrok)
+#   omarchy-ngrok set-authtoken   # enregistre l'authtoken (saisie masquée, ou
+#                                 # variable OMARCHY_NGROK_AUTHTOKEN)
 set -euo pipefail
 
 API="http://127.0.0.1:4040/api/tunnels"
@@ -14,17 +16,77 @@ if ! command -v ngrok >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ "${1:-}" == "status" ]]; then
-  if command -v curl >/dev/null 2>&1; then
-    curl -sf "$API" || { echo "omarchy-ngrok: aucun agent ngrok actif (API ${API} injoignable)." >&2; exit 1; }
-  else
-    echo "omarchy-ngrok: curl requis pour 'status'." >&2
+# Écrit l'authtoken dans ngrok.yml sans jamais le passer en argument :
+# `ngrok config add-authtoken <token>` l'exposerait aux autres utilisateurs
+# locaux via /proc/<pid>/cmdline. awk le lit dans son environnement (lisible
+# par l'utilisateur seul) ; le fichier reste en 0600 et est remplacé
+# atomiquement, puis validé par `ngrok config check`.
+set_authtoken() {
+  local token="${OMARCHY_NGROK_AUTHTOKEN:-}"
+  unset OMARCHY_NGROK_AUTHTOKEN
+  if [[ -z "$token" ]]; then
+    read -rsp "Authtoken ngrok : " token
+    echo
+  fi
+  if [[ ! "$token" =~ ^[A-Za-z0-9_-]{8,200}$ ]]; then
+    echo "omarchy-ngrok: authtoken invalide (lettres, chiffres, _ et - uniquement)." >&2
     exit 1
   fi
-  exit 0
-fi
 
-PORT="${1:?Usage: omarchy-ngrok <port> [args ngrok...]}"
+  umask 077
+  local conf
+  # `config check` sort en erreur tant que le fichier n'existe pas.
+  conf="$(ngrok config check 2>&1 | sed -n 's/^Valid configuration file at //p' | head -1)" || true
+  [[ -n "$conf" ]] || conf="${XDG_CONFIG_HOME:-$HOME/.config}/ngrok/ngrok.yml"
+  mkdir -p "$(dirname "$conf")"
+
+  local tmp
+  tmp="$(mktemp "${conf}.XXXXXX")"
+  trap 'rm -f "$tmp"' EXIT
+  if [[ -s "$conf" ]]; then
+    # Remplace la ligne authtoken existante (v2 à la racine ou v3 sous agent:),
+    # sinon l'ajoute sous agent:, sinon ajoute la section adaptée à la version.
+    local has_token=0
+    grep -qE '^[[:space:]]*authtoken:' "$conf" && has_token=1
+    NGROK_TOKEN="$token" awk -v has_token="$has_token" '
+      BEGIN { t = ENVIRON["NGROK_TOKEN"] }
+      has_token && /^[ \t]*authtoken:/ { match($0, /^[ \t]*/); print substr($0, 1, RLENGTH) "authtoken: " t; next }
+      !has_token && !done && /^agent:[ \t]*$/ { print; print "    authtoken: " t; done = 1; next }
+      /^version:[ \t]*"?2"?[ \t]*$/ { v2 = 1 }
+      { print }
+      END { if (!has_token && !done) { if (v2) print "authtoken: " t; else { print "agent:"; print "    authtoken: " t } } }
+    ' "$conf" > "$tmp"
+  else
+    NGROK_TOKEN="$token" awk 'BEGIN { print "version: \"3\""; print "agent:"; print "    authtoken: " ENVIRON["NGROK_TOKEN"] }' > "$tmp"
+  fi
+  chmod 600 "$tmp"
+
+  if ! ngrok config check --config "$tmp" >/dev/null 2>&1; then
+    echo "omarchy-ngrok: la configuration obtenue est invalide, ${conf} n'a pas été modifié." >&2
+    exit 1
+  fi
+  mv -f "$tmp" "$conf"
+  trap - EXIT
+  echo "Authtoken enregistré dans ${conf}"
+}
+
+case "${1:-}" in
+  status)
+    if command -v curl >/dev/null 2>&1; then
+      curl -sf "$API" || { echo "omarchy-ngrok: aucun agent ngrok actif (API ${API} injoignable)." >&2; exit 1; }
+    else
+      echo "omarchy-ngrok: curl requis pour 'status'." >&2
+      exit 1
+    fi
+    exit 0
+    ;;
+  set-authtoken)
+    set_authtoken
+    exit 0
+    ;;
+esac
+
+PORT="${1:?Usage: omarchy-ngrok <port> [args ngrok...] | status | set-authtoken}"
 shift || true
 
 echo "omarchy-ngrok: exposition du port ${PORT} via ngrok…"

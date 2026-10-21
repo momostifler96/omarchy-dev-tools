@@ -42,7 +42,10 @@ ToolHeader {
       tokenStatus = "Entre un authtoken d'abord (gratuit sur dashboard.ngrok.com)."
       return
     }
-    tokenSaveProc.command = ["ngrok", "config", "add-authtoken", t]
+    // Le token passe par l'environnement du processus (lisible par
+    // l'utilisateur seul), jamais par la ligne de commande : voir
+    // `omarchy-ngrok set-authtoken`.
+    tokenSaveProc.environment = { "OMARCHY_NGROK_AUTHTOKEN": t }
     tokenSaveProc.running = true
   }
 
@@ -250,8 +253,9 @@ ToolHeader {
 
   Process {
     id: tokenSaveProc
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector { waitForEnd: true }
+    command: [Qt.resolvedUrl("../bin/omarchy-ngrok").toString().replace(/^file:\/\//, ""), "set-authtoken"]
+    stdout: StdioCollector { id: stdoutCollector; waitForEnd: true }
+    stderr: StdioCollector { id: stderrCollector; waitForEnd: true }
     onExited: function(code) {
       if (code === 0) {
         tokenField.text = ""

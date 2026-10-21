@@ -153,11 +153,11 @@ ToolHeader {
   Process {
     id: execProc
     property string mode: "add"
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector { waitForEnd: true }
+    stdout: StdioCollector { id: execOut; waitForEnd: true }
+    stderr: StdioCollector { id: execErr; waitForEnd: true }
 
     onExited: function(code) {
-      var out = (stdoutCollector.text + "\n" + stderrCollector.text).trim()
+      var out = (execOut.text + "\n" + execErr.text).trim()
       if (code === 0) {
         root.setStatus(execProc.mode === "add" ? "Vhost créé avec succès." : "Vhost supprimé.", "ok")
         root.runList()
