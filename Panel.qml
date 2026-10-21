@@ -53,7 +53,6 @@ Panel {
 
   function saveState() {
     stateFile.setText(JSON.stringify({ lastTool: root.currentTool }))
-    stateFile.writeAdapter()
   }
 
   // ---------- Registre des outils ----------
@@ -63,6 +62,7 @@ Panel {
     { id: "jwt",      name: "JWT Decoder",              category: "Sécurité",        file: "JwtTool.qml" },
     { id: "hash",     name: "Hash SHA",                 category: "Sécurité",        file: "HashTool.qml" },
     { id: "uuid",     name: "Générateur UUID",          category: "Générateurs",     file: "UuidTool.qml" },
+    { id: "token",    name: "Générateur de token",      category: "Générateurs",     file: "TokenTool.qml" },
     { id: "lorem",    name: "Lorem Ipsum",              category: "Générateurs",     file: "LoremTool.qml" },
     { id: "json",     name: "JSON Formatter",           category: "Texte & données", file: "JsonTool.qml" },
     { id: "regex",    name: "Testeur Regex",            category: "Texte & données", file: "RegexTool.qml" },

@@ -31,7 +31,7 @@ cat <<'EOF'
 
 ==> Raccourci clavier (optionnel) :
   Ajoute dans ~/.config/hypr/bindings.lua :
-    o.bind("SUPER + T", "Omarchy Dev Tools", "omarchy-dev-tools")
+    o.bind("SUPER + SHIFT + T", "Omarchy Dev Tools", "omarchy-shell -q shell toggle momoledev.dev-tools")
 
 EOF
 

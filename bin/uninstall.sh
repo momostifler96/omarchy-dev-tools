@@ -17,7 +17,7 @@ cat <<'EOF'
 ==> Étapes manuelles restantes :
   - Retire le widget de la barre : omarchy bar remove momoledev.dev-tools
     (ou omarchy plugin remove momoledev.dev-tools pour tout retirer)
-  - Retire le raccourci o.bind("SUPER + T", ...) de ~/.config/hypr/bindings.lua si présent.
+  - Retire le raccourci o.bind("SUPER + SHIFT + T", ...) de ~/.config/hypr/bindings.lua si présent.
 
 ==> Désinstallation terminée.
 EOF

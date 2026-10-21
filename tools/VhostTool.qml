@@ -27,7 +27,7 @@ ToolHeader {
 
   function installDeps() {
     installLaunched = true
-    installProc.command = ["foot", "-e", "bash", "-c",
+    installProc.command = ["xdg-terminal-exec", "bash", "-c",
       "yay -S --needed " + missingDeps.join(" ") +
       "; echo; echo 'Installation terminée (ou interrompue) — ferme cette fenêtre.'; read -r _"]
     installProc.running = true
@@ -48,7 +48,7 @@ ToolHeader {
   }
 
   function addCommand() {
-    var d = domain.text.trim() || "monapp.test"
+    var d = domain.text.trim().toLowerCase() || "monapp.test"
     var p = port.text.trim() || "3000"
     var f = addFlags()
     return "pkexec omarchy-vhost add " + d + " " + p + (f.length ? " " + f.join(" ") : "")
@@ -57,12 +57,12 @@ ToolHeader {
   function updateCmd() {
     addCmd.text = addCommand()
     addCmd.kind = "neutral"
-    otherCmds.text = "omarchy-vhost list\npkexec omarchy-vhost remove " + (domain.text.trim() || "monapp.test")
+    otherCmds.text = "omarchy-vhost list\npkexec omarchy-vhost remove " + (domain.text.trim().toLowerCase() || "monapp.test")
   }
 
   function runCreate() {
     setStatus("Création en cours (validez le dialogue mot de passe)…", "neutral")
-    var args = ["omarchy-vhost", "add", domain.text.trim() || "monapp.test", port.text.trim() || "3000"].concat(addFlags())
+    var args = ["omarchy-vhost", "add", domain.text.trim().toLowerCase() || "monapp.test", port.text.trim() || "3000"].concat(addFlags())
     execProc.mode = "add"
     execProc.command = ["pkexec"].concat(args)
     execProc.running = true

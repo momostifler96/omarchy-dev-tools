@@ -29,6 +29,29 @@ EOF
   exit 1
 }
 
+# Ce script tourne en root (sudo/pkexec) : le domaine finit dans /etc/hosts,
+# dans une config nginx et dans des chemins de fichiers (dont un rm -rf), le
+# port dans proxy_pass. On n'accepte donc qu'un nom d'hôte DNS en minuscules
+# (lettres, chiffres, tirets, au moins un point) et un port entier 1-65535.
+validate_domain() {
+  local d="$1" label='[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?'
+  if [[ ${#d} -gt 253 || ! "$d" =~ ^${label}(\.${label})+$ ]]; then
+    echo "omarchy-vhost: domaine invalide '${d}' (attendu : ex. monapp.test, minuscules, chiffres, tirets et points)." >&2
+    exit 1
+  fi
+}
+
+validate_port() {
+  local p="$1"
+  if [[ ! "$p" =~ ^[0-9]{1,5}$ ]] || (( 10#$p < 1 || 10#$p > 65535 )); then
+    echo "omarchy-vhost: port invalide '${p}' (attendu : entier entre 1 et 65535)." >&2
+    exit 1
+  fi
+}
+
+# Domaine échappé pour grep -E / sed (les points sont littéraux).
+domain_regex() { printf '%s' "${1//./\\.}"; }
+
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     echo "omarchy-vhost: cette commande nécessite sudo." >&2
@@ -93,35 +116,44 @@ reload_nginx() {
 # Préfère mkcert (certificat de confiance, sans avertissement navigateur) ; à
 # défaut, génère un certificat autosigné avec openssl.
 ensure_cert() {
+  # Les messages vont sur stderr : stdout ne porte que "cert:key", capturé
+  # par cmd_add.
   local domain="$1"
   local dir="${CERT_DIR}/${domain}"
   local cert="${dir}/cert.pem" key="${dir}/key.pem"
 
   if [[ -f "$cert" && -f "$key" ]]; then
-    echo "  = certificat existant réutilisé: ${dir}"
+    echo "  = certificat existant réutilisé: ${dir}" >&2
     echo "$cert:$key"
     return
   fi
 
-  mkdir -p "$dir"
+  # Clé privée lisible par root uniquement.
+  mkdir -p -m 700 "$dir"
+  local old_umask
+  old_umask="$(umask)"
+  umask 077
 
   if command -v mkcert >/dev/null 2>&1; then
     mkcert -cert-file "$cert" -key-file "$key" "$domain" >/dev/null
-    echo "  + certificat mkcert généré (root CA locale de confiance): ${dir}"
+    echo "  + certificat mkcert généré (root CA locale de confiance): ${dir}" >&2
   elif command -v openssl >/dev/null 2>&1; then
     openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
       -subj "/CN=${domain}" \
       -addext "subjectAltName=DNS:${domain}" \
       -keyout "$key" -out "$cert" >/dev/null 2>&1
-    echo "  + certificat autosigné généré: ${dir}"
-    echo "    (le navigateur affichera un avertissement de confiance tant que tu ne"
-    echo "     l'importes pas manuellement, ou installe mkcert pour l'éviter:"
-    echo "     https://github.com/FiloSottile/mkcert)"
+    echo "  + certificat autosigné généré: ${dir}" >&2
+    echo "    (le navigateur affichera un avertissement de confiance tant que tu ne" >&2
+    echo "     l'importes pas manuellement, ou installe mkcert pour l'éviter:" >&2
+    echo "     https://github.com/FiloSottile/mkcert)" >&2
   else
     echo "omarchy-vhost: ni mkcert ni openssl trouvés, impossible de générer un certificat HTTPS." >&2
     exit 1
   fi
 
+  chmod 600 "$key"
+  chmod 644 "$cert"
+  umask "$old_umask"
   echo "$cert:$key"
 }
 
@@ -139,10 +171,14 @@ cmd_add() {
 
   domain="${positional[0]:?domaine manquant}"
   port="${positional[1]:?port manquant}"
+  [[ ${#positional[@]} -le 2 ]] || usage
+  validate_domain "$domain"
+  validate_port "$port"
+  port=$((10#$port))
 
   require_root
 
-  if grep -qE "^[0-9.]+\s+${domain}(\s|\$)" "$HOSTS_FILE"; then
+  if grep -qE "^[0-9.]+\s+$(domain_regex "$domain")(\s|\$)" "$HOSTS_FILE"; then
     echo "omarchy-vhost: '${domain}' est déjà présent dans ${HOSTS_FILE}." >&2
   else
     echo "127.0.0.1 ${domain} ${MARKER}" >> "$HOSTS_FILE"
@@ -226,10 +262,13 @@ EOF
 
 cmd_remove() {
   local domain="${1:?domaine manquant}"
+  validate_domain "$domain"
   require_root
 
-  if grep -q "${MARKER}\$" "$HOSTS_FILE" && grep -qE "\s${domain}\s.*${MARKER}\$" "$HOSTS_FILE"; then
-    sed -i "/\s${domain}\s.*${MARKER}\$/d" "$HOSTS_FILE"
+  local re
+  re="$(domain_regex "$domain")"
+  if grep -qE "\s${re}\s.*${MARKER}\$" "$HOSTS_FILE"; then
+    sed -i -E "/\s${re}\s.*${MARKER}\$/d" "$HOSTS_FILE"
     echo "  - ${HOSTS_FILE}: entrée '${domain}' retirée"
   else
     echo "  ! aucune entrée gérée par omarchy-vhost trouvée pour '${domain}' dans ${HOSTS_FILE}" >&2

@@ -46,8 +46,11 @@ ToolHeader {
   }
 
   Row {
+    id: swatchRow
     visible: root.palette.length > 0
     spacing: Style.space(6)
+    // 11 nuances sur la largeur disponible, 40 px max.
+    readonly property real cell: Math.min(Style.space(40), Math.floor((root.width - spacing * 10) / 11))
 
     Repeater {
       model: root.palette
@@ -55,10 +58,11 @@ ToolHeader {
       delegate: Column {
         id: swatchCol
         required property var modelData
+        width: swatchRow.cell
         spacing: Style.space(2)
 
         Rectangle {
-          width: Style.space(40); height: Style.space(40)
+          width: swatchRow.cell; height: swatchRow.cell
           radius: Style.cornerRadius
           color: swatchCol.modelData.hex
           border.width: Style.normalBorderWidth
@@ -79,11 +83,14 @@ ToolHeader {
         }
 
         Text {
-          anchors.horizontalCenter: parent.horizontalCenter
+          width: swatchRow.cell
+          horizontalAlignment: Text.AlignHCenter
           text: swatchCol.modelData.hex
           color: Util.alpha(Color.popups.text, 0.7)
           font.family: "monospace"
           font.pixelSize: 9
+          fontSizeMode: Text.HorizontalFit
+          minimumPixelSize: 6
         }
       }
     }

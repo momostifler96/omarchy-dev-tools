@@ -19,7 +19,7 @@ ToolHeader {
   // puis re-vérifie automatiquement toutes les 4s.
   function installNgrok() {
     installLaunched = true
-    installProc.command = ["foot", "-e", "bash", "-c",
+    installProc.command = ["xdg-terminal-exec", "bash", "-c",
       "yay -S --needed ngrok; echo; echo 'Installation terminée (ou interrompue) — ferme cette fenêtre.'; read -r _"]
     installProc.running = true
     installPoll.restart()

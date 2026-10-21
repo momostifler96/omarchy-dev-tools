@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "momoledev.dev-tools",
   "name": "Dev Tools",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "momoledev",
   "license": "MIT",
-  "description": "Boîte à outils développeur native (panel QML) : Base64, JWT, hash, UUID, JSON, regex, couleurs, palette Tailwind, cron, vhosts, ngrok… Icône </> dans la barre, toggle du panneau.",
+  "description": "Boîte à outils développeur native (panel QML) : Base64, JWT, hash, UUID, tokens, JSON, regex, couleurs, palette Tailwind, cron, vhosts locaux, ngrok… Icône </> dans la barre.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,8 +14,8 @@
   },
   "barWidget": {
     "displayName": "Dev Tools",
-    "description": "Ouvre la boîte à outils développeur (fenêtre app navigateur).",
-    "category": "Development",
+    "description": "Ouvre le panneau d'outils développeur (17 outils).",
+    "category": "Productivity",
     "allowMultiple": false,
     "defaultSection": "right"
   }
