@@ -105,6 +105,10 @@ Ce que fait `add` :
 - ajoute `127.0.0.1 <domaine>  # omarchy-vhost` à `/etc/hosts` ;
 - écrit `/etc/nginx/sites-available/<domaine>.conf` (proxy vers `127.0.0.1:<port>`,
   WebSocket inclus), l'active dans `sites-enabled/`, vérifie `nginx -t` puis recharge.
+  Si `/etc/nginx/nginx.conf` n'inclut pas encore `sites-enabled/` (cas du paquet Arch),
+  ajoute `include /etc/nginx/sites-enabled/*.conf; # omarchy-vhost` en tête du bloc `http`,
+  après une copie dans `nginx.conf.omarchy-vhost.bak` ; si `nginx -t` échoue, le fichier
+  est restauré et rien n'est créé.
   Le proxy écoute uniquement sur `127.0.0.1` (ports 80/443) : il n'est pas joignable
   depuis le réseau ;
 - avec `--https`, crée un certificat dans `/etc/omarchy-vhost/certs/<domaine>/`
@@ -140,6 +144,7 @@ Internet : n'exposez que ce que vous voulez publier.
 | `~/.local/state/omarchy/dev-tools.json` | dernier outil ouvert |
 | `~/.local/bin/omarchy-{dev-tools,vhost,ngrok}` | CLI, si `bin/install.sh` a été lancé |
 | `/etc/hosts`, `/etc/nginx/sites-*/<domaine>.conf`, `/etc/omarchy-vhost/` | vhosts créés à votre demande |
+| `/etc/nginx/nginx.conf` (ligne `# omarchy-vhost`), `nginx.conf.omarchy-vhost.bak` | include de `sites-enabled/`, ajouté au premier vhost nginx s'il manque ; laissé en place à la désinstallation |
 
 ## Dépannage
 

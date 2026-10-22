@@ -3,6 +3,18 @@
 Toutes les évolutions notables du projet sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.4.3] — 2026-10-22
+
+### Security
+- L'outil Hash envoie le texte à `shaNNNsum` par stdin au lieu de le passer en argument
+  de `bash -c`, où il était lisible par les autres utilisateurs dans `/proc/<pid>/cmdline`.
+
+### Fixed
+- Le `nginx.conf` fourni par Arch n'inclut pas `sites-enabled/`, si bien que les vhosts
+  n'étaient jamais servis. `omarchy-vhost add` ajoute `include /etc/nginx/sites-enabled/*.conf;`
+  (marqué `# omarchy-vhost`) en tête du bloc `http` quand aucun include n'existe, après une
+  copie `nginx.conf.omarchy-vhost.bak`, et restaure le fichier si `nginx -t` échoue.
+
 ## [0.4.2] — 2026-10-21
 
 ### Security

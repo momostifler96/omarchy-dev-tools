@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "momoledev.dev-tools",
   "name": "Dev Tools",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "author": "momoledev",
   "license": "MIT",
   "description": "Boîte à outils développeur native (panel QML) : Base64, JWT, hash, UUID, tokens, JSON, regex, couleurs, palette Tailwind, cron, vhosts locaux, ngrok… Icône </> dans la barre.",

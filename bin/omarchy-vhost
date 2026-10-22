@@ -11,6 +11,7 @@ set -euo pipefail
 HOSTS_FILE="/etc/hosts"
 NGINX_AVAILABLE="/etc/nginx/sites-available"
 NGINX_ENABLED="/etc/nginx/sites-enabled"
+NGINX_CONF="/etc/nginx/nginx.conf"
 CERT_DIR="/etc/omarchy-vhost/certs"
 MARKER="# omarchy-vhost"
 
@@ -111,6 +112,26 @@ offer_install_nginx() {
   esac
 }
 
+# Le nginx.conf d'Arch n'inclut pas sites-enabled/ : sans cette ligne, les
+# configs générées ne sont jamais chargées. On l'ajoute en tête du bloc http
+# (une seule fois, marquée), on garde une copie et on la restaure si nginx -t
+# échoue.
+ensure_nginx_include() {
+  if grep -qE "^[^#]*include[[:space:]]+(${NGINX_ENABLED}|sites-enabled)/" "$NGINX_CONF"; then
+    return 0
+  fi
+  local backup="${NGINX_CONF}.omarchy-vhost.bak"
+  cp -p "$NGINX_CONF" "$backup"
+  if ! sed -i -E "0,/^[[:space:]]*http[[:space:]]*\{/s||&\n    include ${NGINX_ENABLED}/*.conf; ${MARKER}|" "$NGINX_CONF" \
+     || ! grep -q "include ${NGINX_ENABLED}/\*.conf; ${MARKER}" "$NGINX_CONF" \
+     || ! nginx -t >/dev/null 2>&1; then
+    cp -p "$backup" "$NGINX_CONF"
+    echo "omarchy-vhost: impossible d'ajouter 'include ${NGINX_ENABLED}/*.conf;' au bloc http de ${NGINX_CONF} ; ajoute-le à la main." >&2
+    return 1
+  fi
+  echo "  + ${NGINX_CONF}: include ${NGINX_ENABLED}/*.conf (copie: ${backup})"
+}
+
 reload_nginx() {
   if nginx -t 2>/dev/null; then
     if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
@@ -206,6 +227,10 @@ cmd_add() {
       echo "omarchy-vhost: ${link} existe et n'a pas été créé par omarchy-vhost ; rien n'a été modifié." >&2
       exit 1
     fi
+  fi
+
+  if [[ "$use_nginx" -eq 1 ]] && has_nginx; then
+    ensure_nginx_include || exit 1
   fi
 
   if grep -qE "^[0-9.]+\s+$(domain_regex "$domain")(\s|\$)" "$HOSTS_FILE"; then

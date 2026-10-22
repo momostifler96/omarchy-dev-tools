@@ -8,10 +8,13 @@ ToolHeader {
   title: "Hash de texte"
   description: "Calcule le hash SHA-1 / SHA-256 / SHA-384 / SHA-512 d'un texte (via shaNNNsum)."
 
+  // Le texte passe par stdin, jamais en argument : /proc/<pid>/cmdline est
+  // lisible par tous les utilisateurs locaux.
   function run() {
-    var algo = algoSel.value
-    var cmd = "printf '%s' \"$1\" | " + algo.toLowerCase().replace("-", "") + "sum | cut -d' ' -f1"
-    hashProc.command = ["bash", "-c", cmd, "bash", input.text]
+    if (hashProc.running) return
+    hashProc.payload = input.text
+    hashProc.stdinEnabled = true
+    hashProc.command = [algoSel.value.toLowerCase().replace("-", "") + "sum"]
     hashProc.running = true
   }
 
@@ -39,9 +42,12 @@ ToolHeader {
 
   Process {
     id: hashProc
+    property string payload: ""
+    stdinEnabled: true
+    onStarted: { write(payload); stdinEnabled = false }
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: { out.text = text.trim(); out.kind = "ok" }
+      onStreamFinished: { out.text = text.split(" ")[0].trim(); out.kind = "ok" }
     }
     onExited: function(code) {
       if (code !== 0) { out.text = "Erreur: hachage impossible (algo non supporté ?)"; out.kind = "err" }
