@@ -3,7 +3,7 @@
 Toutes les évolutions notables du projet sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Unreleased]
+## [0.4.4] — 2026-10-22
 
 ### Added
 - Palette Tailwind : choix de la version (v4 ou v3). La v4 exporte un bloc `@theme`
