@@ -3,6 +3,13 @@
 Toutes les évolutions notables du projet sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- Palette Tailwind : choix de la version (v4 ou v3). La v4 exporte un bloc `@theme`
+  à coller dans le CSS principal, la v3 l'objet de couleurs pour
+  `theme.extend.colors` de `tailwind.config.js`. Un seul bouton copie l'export choisi.
+
 ## [0.4.3] — 2026-10-22
 
 ### Security

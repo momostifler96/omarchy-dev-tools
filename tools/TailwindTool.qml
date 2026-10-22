@@ -12,11 +12,16 @@ ToolHeader {
   property var palette: []
   property string paletteName: "brand"
 
-  readonly property string configOut: paletteName + ": {\n" +
-    palette.map(function(p) { return "  " + p.key + ": '" + p.hex + "'," }).join("\n") + "\n},"
+  // v3 : objet à placer dans theme.extend.colors de tailwind.config.js.
+  readonly property string v3Out: "'" + paletteName + "': {\n" +
+    palette.map(function(p) { return "  '" + p.key + "': '" + p.hex + "'," }).join("\n") + "\n},"
 
-  readonly property string cssOut: ":root {\n" +
+  // v4 : configuration CSS-first, bloc @theme du fichier CSS principal.
+  readonly property string v4Out: "@theme {\n" +
     palette.map(function(p) { return "  --color-" + paletteName + "-" + p.key + ": " + p.hex + ";" }).join("\n") + "\n}"
+
+  readonly property bool isV4: versionSel.value === "Tailwind v4"
+  readonly property string exportOut: isV4 ? v4Out : v3Out
 
   function run() {
     try {
@@ -104,30 +109,34 @@ ToolHeader {
     font.pixelSize: Style.font.caption
   }
 
-  Text {
+  Dropdown {
+    id: versionSel
     visible: root.palette.length > 0
-    text: "Config Tailwind (tailwind.config.js)"
-    color: Color.popups.text
-    font.family: Style.font.family
-    font.pixelSize: Style.font.caption
-  }
-  ResultBox { visible: root.palette.length > 0; text: root.configOut }
-
-  Row {
-    visible: root.palette.length > 0
-    spacing: Style.space(8)
-    CopyButton { value: root.configOut; label: "Copier la config" }
-    CopyButton { value: root.cssOut; label: "Copier le CSS" }
+    label: "Version"
+    value: "Tailwind v4"
+    options: ["Tailwind v4", "Tailwind v3"]
+    foreground: Color.popups.text
+    width: Style.space(160)
   }
 
   Text {
     visible: root.palette.length > 0
-    text: "Variables CSS"
-    color: Color.popups.text
+    width: root.width
+    text: root.isV4
+      ? "À coller dans votre CSS principal, après @import \"tailwindcss\"; (classes bg-" + root.paletteName + "-500…)"
+      : "À coller dans theme.extend.colors de tailwind.config.js (classes bg-" + root.paletteName + "-500…)"
+    color: Util.alpha(Color.popups.text, 0.7)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
+    wrapMode: Text.WordWrap
   }
-  ResultBox { visible: root.palette.length > 0; text: root.cssOut }
+  ResultBox { visible: root.palette.length > 0; text: root.exportOut }
+
+  CopyButton {
+    visible: root.palette.length > 0
+    value: root.exportOut
+    label: root.isV4 ? "Copier le @theme (v4)" : "Copier la config (v3)"
+  }
 
   Component.onCompleted: run()
 }
